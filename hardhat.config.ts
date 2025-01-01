@@ -1,10 +1,17 @@
-require('@nomicfoundation/hardhat-toolbox');
-require('@openzeppelin/hardhat-upgrades');
-require('hardhat-contract-sizer');
-require('hardhat-gas-reporter');
+import { HardhatUserConfig } from 'hardhat/config';
 
-/** @type import('hardhat/config').HardhatUserConfig */
-module.exports = {
+import dotenv from 'dotenv';
+
+import '@nomicfoundation/hardhat-toolbox';
+import "@nomiclabs/hardhat-solhint";
+
+import '@openzeppelin/hardhat-upgrades';
+import 'hardhat-contract-sizer';
+import 'hardhat-gas-reporter';
+
+dotenv.config();
+
+const config: HardhatUserConfig = {
   solidity: {
     version: '0.8.26',
     settings: {
@@ -33,10 +40,12 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
-      polygon: process.env.HARDHAT_ETHERSCAN_API_KEY,
+      polygon: process.env.HARDHAT_ETHERSCAN_API_KEY!,
     },
   },
   mocha: {
     timeout: 0,
   },
 };
+
+export default config;

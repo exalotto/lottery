@@ -3,12 +3,15 @@
   "version": "0.3.0",
   "private": true,
   "scripts": {
+    "prettier": "npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol' 'scripts/**/*' 'test/**/*'",
     "build": "npx hardhat compile",
-    "prettier": "npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'"
+    "test": "npx hardhat test"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomiclabs/hardhat-solhint": "^4.0.1",
     "@openzeppelin/hardhat-upgrades": "^3.8.0",
+    "dotenv": "^16.4.7",
     "hardhat": "^2.22.17",
     "hardhat-contract-sizer": "^2.10.0",
     "prettier": "^3.4.2",

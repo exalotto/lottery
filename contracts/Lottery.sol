@@ -162,6 +162,7 @@ contract Lottery is
   ///   initial state is that no fees have been withdrawn for any referral code.
   mapping(bytes32 => uint) private _lastWithdrawRoundByReferralCode;
 
+  /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
   }
@@ -179,9 +180,9 @@ contract Lottery is
     emit NewRound(1, round.baseTicketPrice, round.prizes, round.stash);
   }
 
-  function initialize(address owner, address _vrfCoordinator) public initializer {
+  function initialize(address _vrfCoordinator) public initializer {
     __UUPSUpgradeable_init();
-    __Ownable_init(owner);
+    __Ownable_init(msg.sender);
     __Pausable_init();
     __ReentrancyGuard_init();
     __Lottery_init_unchained(_vrfCoordinator);
@@ -266,7 +267,10 @@ contract Lottery is
     return _open;
   }
 
-  /// @notice Accept funds from ICO and other sources.
+  /// @notice Accept funds from ICO and other sources. Funds must never be transferred directly to
+  ///   the lottery using the `transfer` method of the currency token, otherwise the lottery won't
+  ///   be able to update its jackpot and stash correctly. Instead, funds must first be approved
+  ///   using the `approve` method of the currency token and then transferred using this method.
   /// @param source The address to take funds from.
   /// @param value The amount to take, which must be approved by `source`.
   function fund(address source, uint256 value) public whenNotPaused {
@@ -332,6 +336,12 @@ contract Lottery is
     RoundData storage round = _getCurrentRoundData();
     uint256 totalValue = round.baseTicketPrice * round.totalCombinations;
     return (totalValue / 10) * 2;
+  }
+
+  /// @notice Returns the total number of tickets ever sold, through all rounds.
+  function getTotalTicketCount() public view returns (uint) {
+    // subtract 1 because ID 0 is invalid / slot 0 is unused
+    return playersByTicket.length - 1;
   }
 
   /// @notice Associates the specified referral `code` with the provided `address`. Reverts if the
