@@ -25,7 +25,7 @@ describe('Lottery', () => {
 
   let snapshot: SnapshotRestorer;
 
-  const currencyTokenAddress = '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063';
+  const currencyTokenAddress = '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063'; // Dai on Polygon PoS
   let currencyToken: IERC20;
 
   let lotteryAddress: string;
@@ -39,7 +39,7 @@ describe('Lottery', () => {
     player = signers[2].address;
     vrfCoordinator = await deployer.deployMockVRFCoordinator();
     await vrfCoordinator.createSubscription();
-    currencyToken = BaseContract.from<IERC20>(currencyTokenAddress, erc20abi);
+    currencyToken = BaseContract.from<IERC20>(currencyTokenAddress, erc20abi).connect(signers[0]);
     lottery = (await deployer.deployLottery(await vrfCoordinator.getAddress())).lottery;
     lotteryAddress = await lottery.getAddress();
     partnerLottery = lottery.connect(signers[1]);
@@ -58,10 +58,10 @@ describe('Lottery', () => {
     requestId = 1;
   });
 
-  const buyTicket = async (numbers: number[]) => {
+  const buyTicket = async (numbers: number[], referralCode: string = NULL_REFERRAL_CODE) => {
     const price = await playerLottery.getTicketPrice(numbers);
     currencyToken.approve(lotteryAddress, price);
-    await playerLottery.createTicket(NULL_REFERRAL_CODE, numbers);
+    await playerLottery.createTicket(referralCode, numbers);
   };
 
   const draw = async () => {
@@ -89,6 +89,98 @@ describe('Lottery', () => {
     expect(await lottery.getPartnerRevenue(REFERRAL_CODE1)).to.equal(0);
     expect(await lottery.getPartnerRevenue(REFERRAL_CODE2)).to.equal(0);
     expect(await lottery.getTotalRevenue()).to.equal(0);
+  });
+
+  describe('referral codes', () => {
+    it('unclaimed', async () => {
+      expect(await lottery.referralCodesByPartner(partner, 0)).to.equal(REFERRAL_CODE1);
+      await expect(lottery.referralCodesByPartner(partner, 1)).to.be.reverted;
+    });
+
+    it('cannot claim null', async () => {
+      await expect(partnerLottery.claimReferralCode(NULL_REFERRAL_CODE, partner)).to.be.reverted;
+    });
+
+    it('claim', async () => {
+      await partnerLottery.claimReferralCode(REFERRAL_CODE2, partner);
+      expect(await lottery.referralCodesByPartner(partner, 0)).to.equal(REFERRAL_CODE1);
+      expect(await lottery.referralCodesByPartner(partner, 1)).to.equal(REFERRAL_CODE2);
+      await expect(lottery.referralCodesByPartner(partner, 2)).to.be.reverted;
+    });
+
+    it('double claim', async () => {
+      await partnerLottery.claimReferralCode(REFERRAL_CODE2, partner);
+      await expect(partnerLottery.claimReferralCode(REFERRAL_CODE2, partner)).to.be.reverted;
+    });
+
+    it('cannot claim when paused', async () => {
+      await lottery.pause();
+      await expect(partnerLottery.claimReferralCode(REFERRAL_CODE2, partner)).to.be.reverted;
+    });
+
+    it('can claim again when unpaused', async () => {
+      await lottery.pause();
+      await lottery.unpause();
+      await partnerLottery.claimReferralCode(REFERRAL_CODE2, partner);
+      expect(await lottery.referralCodesByPartner(partner, 0)).to.equal(REFERRAL_CODE1);
+      expect(await lottery.referralCodesByPartner(partner, 1)).to.equal(REFERRAL_CODE2);
+      await expect(lottery.referralCodesByPartner(partner, 2)).to.be.reverted;
+    });
+  });
+
+  describe('getTicketPrice', () => {
+    it('0 numbers', async () => {
+      await expect(lottery.getTicketPrice([])).to.be.reverted;
+    });
+
+    it('5 numbers', async () => {
+      await expect(lottery.getTicketPrice([1, 2, 3, 4, 5])).to.be.reverted;
+    });
+
+    it('6 numbers', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      expect(await lottery.getTicketPrice([1, 2, 3, 4, 5, 6])).to.equal(price);
+    });
+
+    it('7 numbers', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      expect(await lottery.getTicketPrice([1, 2, 3, 4, 5, 6, 7])).to.equal(price * 7n);
+    });
+
+    it('8 numbers', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      expect(await lottery.getTicketPrice([1, 2, 3, 4, 5, 6, 7, 8])).to.equal(price * 28n);
+    });
+
+    it('duplicate numbers', async () => {
+      await expect(lottery.getTicketPrice([1, 2, 3, 1, 2, 3])).to.be.reverted;
+    });
+
+    it('out of range numbers', async () => {
+      await expect(lottery.getTicketPrice([1, 2, 3, 100, 5, 6])).to.be.reverted;
+    });
+  });
+
+  describe('getPartnerRevenue', () => {
+    it('succeeds on partner fees', async () => {
+      expect(await lottery.getPartnerRevenue(REFERRAL_CODE1)).to.equal(0);
+    });
+
+    it('picks up ticket fees', async () => {
+      const numbers = [1, 2, 3, 4, 5, 6];
+      const price = await lottery.getTicketPrice(numbers);
+      await currencyToken.approve(lotteryAddress, price);
+      await lottery.createTicket(REFERRAL_CODE1, numbers);
+      expect(await lottery.getPartnerRevenue(REFERRAL_CODE1)).to.equal(price / 10n);
+    });
+
+    it("doesn't pick up owner fees", async () => {
+      const numbers = [1, 2, 3, 4, 5, 6];
+      const price = await lottery.getTicketPrice(numbers);
+      await currencyToken.approve(lotteryAddress, price);
+      await lottery.createTicket(NULL_REFERRAL_CODE, numbers);
+      expect(await lottery.getPartnerRevenue(REFERRAL_CODE1)).to.equal(0);
+    });
   });
 
   // TODO
