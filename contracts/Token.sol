@@ -29,34 +29,23 @@ contract LotteryToken is ERC20, ERC20Burnable, ERC20Permit, ERC20Votes {
     return _totalDelegationCheckpoints.upperLookup(SafeCast.toUint48(blockNumber));
   }
 
-  function _update(address from, address to, uint256 amount) internal override(ERC20, ERC20Votes) {
-    super._update(from, to, amount);
-    address fromDelegatee = delegates(from);
-    address toDelegatee = delegates(to);
+  function _moveDelegateVotes(address from, address to, uint256 amount) internal override {
+    super._moveDelegateVotes(from, to, amount);
     uint256 votes = getTotalVotes();
-    if (fromDelegatee == address(0) && toDelegatee != address(0)) {
+    if (from == address(0) && to != address(0)) {
       votes += amount;
     }
-    if (fromDelegatee != address(0) && toDelegatee == address(0)) {
+    if (from != address(0) && to == address(0)) {
       votes -= amount;
     }
     _totalDelegationCheckpoints.push(SafeCast.toUint48(block.number), SafeCast.toUint208(votes));
   }
 
-  function _delegate(address delegator, address delegatee) internal override {
-    address formerDelegatee = delegates(delegator);
-    super._delegate(delegator, delegatee);
-    uint256 votes = getTotalVotes();
-    if (formerDelegatee == address(0) && delegatee != address(0)) {
-      votes += balanceOf(delegator);
-    }
-    if (formerDelegatee != address(0) && delegatee == address(0)) {
-      votes -= balanceOf(delegator);
-    }
-    _totalDelegationCheckpoints.push(SafeCast.toUint48(block.number), SafeCast.toUint208(votes));
-  }
-
   // The following functions are overrides required by Solidity.
+
+  function _update(address from, address to, uint256 amount) internal override(ERC20, ERC20Votes) {
+    super._update(from, to, amount);
+  }
 
   function nonces(address owner) public view override(ERC20Permit, Nonces) returns (uint256) {
     return super.nonces(owner);
