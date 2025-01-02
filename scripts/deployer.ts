@@ -2,6 +2,7 @@ import { ethers } from 'hardhat';
 
 import type {
   Drawing,
+  FakeToken,
   Lottery,
   LotteryController,
   LotteryGovernor,
@@ -29,6 +30,10 @@ export class Deployer {
     this._owner = owner || (await this.getDefaultSigner());
     this._deployer = this._signers[0];
     console.log('Deployer initialized, the signer is', this._deployer);
+  }
+
+  public deployFakeTokenForTesting(): Promise<FakeToken> {
+    return deploy('FakeToken');
   }
 
   public deployMockVRFCoordinator(): Promise<MockVRFCoordinator> {
@@ -82,6 +87,7 @@ export class Deployer {
   }
 
   public async deployLottery(
+    currencyToken: string = process.env.EXALOTTO_CURRENCY_TOKEN!,
     vrfCoordinatorAddress: string = process.env.CHAINLINK_VRF_COORDINATOR!,
   ): Promise<{
     drawingLibrary: Drawing;
@@ -95,11 +101,15 @@ export class Deployer {
       indexLibrary.getAddress(),
       ticketLibrary.getAddress(),
     ]);
-    const lottery = await deployWithProxy<Lottery>('Lottery', [vrfCoordinatorAddress], {
-      Drawing: drawingLibraryAddress,
-      TicketIndex: indexLibraryAddress,
-      UserTickets: ticketLibraryAddress,
-    });
+    const lottery = await deployWithProxy<Lottery>(
+      'Lottery',
+      [currencyToken, vrfCoordinatorAddress],
+      {
+        Drawing: drawingLibraryAddress,
+        TicketIndex: indexLibraryAddress,
+        UserTickets: ticketLibraryAddress,
+      },
+    );
     return { drawingLibrary, indexLibrary, ticketLibrary, lottery };
   }
 
@@ -170,6 +180,7 @@ export class Deployer {
   }
 
   public async deployGovernance(
+    currencyTokenAddress: string = process.env.EXALOTTO_CURRENCY_TOKEN!,
     vrfCoordinatorAddress: string = process.env.CHAINLINK_VRF_COORDINATOR!,
   ): Promise<{
     token: LotteryToken;
@@ -178,7 +189,7 @@ export class Deployer {
     governor: LotteryGovernor;
   }> {
     const token = await this.deployToken();
-    const { lottery } = await this.deployLottery(vrfCoordinatorAddress);
+    const { lottery } = await this.deployLottery(currencyTokenAddress, vrfCoordinatorAddress);
     const controller = await this.deployController(token, lottery);
     const governor = await this.deployGovernor(token, controller);
     return { token, lottery, controller, governor };
@@ -200,6 +211,7 @@ export class Deployer {
   }
 
   public async deployAll(
+    currencyTokenAddress: string = process.env.EXALOTTO_CURRENCY_TOKEN!,
     vrfCoordinatorAddress: string = process.env.CHAINLINK_VRF_COORDINATOR!,
   ): Promise<{
     token: LotteryToken;
@@ -209,7 +221,7 @@ export class Deployer {
     ico: LotteryICO;
   }> {
     const token = await this._deployToken();
-    const { lottery } = await this.deployLottery(vrfCoordinatorAddress);
+    const { lottery } = await this.deployLottery(currencyTokenAddress, vrfCoordinatorAddress);
     const controller = await this.deployController(token, lottery);
     const governor = await this.deployGovernor(token, controller);
     const ico = await this.deployICO(token, lottery);

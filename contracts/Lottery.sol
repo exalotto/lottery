@@ -14,9 +14,6 @@ import "./Drawing.sol";
 import "./TicketIndex.sol";
 import "./UserTickets.sol";
 
-/// @dev ERC-20 token used for payments and prizes. Currently set to Dai on Polygon PoS.
-IERC20 constant CURRENCY_TOKEN = IERC20(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063);
-
 /// @dev Since we use Dai, this is set to $1.50.
 uint constant INITIAL_TICKET_PRICE = 150e-2 ether;
 
@@ -120,6 +117,9 @@ contract Lottery is
   error NoPrizeError(uint ticketId);
   error PrizeAlreadyWithdrawnError(uint ticketId);
 
+  /// @notice The ERC-20 token used for payments and prizes.
+  IERC20 public currencyToken;
+
   /// @notice ChainLink VRF coordinator.
   VRFCoordinatorV2Interface public vrfCoordinator;
 
@@ -169,8 +169,12 @@ contract Lottery is
     _disableInitializers();
   }
 
-  function __Lottery_init_unchained(address _vrfCoordinator) private onlyInitializing {
-    vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
+  function __Lottery_init_unchained(
+    IERC20 _currencyToken,
+    VRFCoordinatorV2Interface _vrfCoordinator
+  ) private onlyInitializing {
+    currencyToken = _currencyToken;
+    vrfCoordinator = _vrfCoordinator;
     _baseTicketPrice = INITIAL_TICKET_PRICE;
     playersByTicket.push(); // skip slot 0 because ticket ID 0 is invalid
     _rounds.push(); // skip slot 0 because round 0 is invalid
@@ -182,12 +186,15 @@ contract Lottery is
     emit NewRound(1, round.baseTicketPrice, round.prizes, round.stash);
   }
 
-  function initialize(address _vrfCoordinator) public initializer {
+  function initialize(
+    IERC20 _currencyToken,
+    VRFCoordinatorV2Interface _vrfCoordinator
+  ) public initializer {
     __UUPSUpgradeable_init();
     __Ownable_init(msg.sender);
     __Pausable_init();
     __ReentrancyGuard_init();
-    __Lottery_init_unchained(_vrfCoordinator);
+    __Lottery_init_unchained(_currencyToken, _vrfCoordinator);
   }
 
   function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -280,10 +287,10 @@ contract Lottery is
     uint256 stash = (value * 60) / 248;
     _rounds[currentRound].prizes[4] += value - stash;
     _rounds[currentRound].stash += stash;
-    CURRENCY_TOKEN.transferFrom(source, address(this), value);
+    currencyToken.transferFrom(source, address(this), value);
   }
 
-  /// @notice Accept funding via the ERC-1363 interface. This only works if the `CURRENCY_TOKEN`
+  /// @notice Accept funding via the ERC-1363 interface. This only works if the `currencyToken`
   ///   supports ERC-1363. To trigger such a transfer, the user has to invoke `transferAndCall` on
   ///   the token rather than `transfer`. The opaque `data` argument is ignored.
   function onTransferReceived(
@@ -393,7 +400,7 @@ contract Lottery is
   /// @notice Creates a lottery ticket. The ticket will be associated to `msg.sender`, which will be
   ///   the only account able to withdraw any prizes attributed to the ticket. The price of the
   ///   ticket can be queried beforehand with `getTicketPrice`, and the `createTicket` function will
-  ///   try to transfer that amount of the `CURRENCY_TOKEN` from `msg.sender` to the lottery
+  ///   try to transfer that amount of the `currencyToken` from `msg.sender` to the lottery
   ///   contract, reverting if the transfer fails. Be sure the correct amount is approved before
   ///   invoking `createTicket`.
   /// @param referralCode An optional referral code. If specified it must be valid, i.e. it must
@@ -428,7 +435,7 @@ contract Lottery is
     playersByTicket.push(msg.sender);
     _rounds[currentRound].totalCombinations += combinations;
     _rounds[currentRound].combinationsByReferralCode[referralCode] += combinations;
-    CURRENCY_TOKEN.transferFrom(msg.sender, address(this), price);
+    currencyToken.transferFrom(msg.sender, address(this), price);
     emit Ticket(currentRound, msg.sender, ticketId, numbers, referralCode);
   }
 
@@ -463,7 +470,7 @@ contract Lottery is
     playersByTicket.push(msg.sender);
     _rounds[currentRound].totalCombinations++;
     _rounds[currentRound].combinationsByReferralCode[referralCode]++;
-    CURRENCY_TOKEN.transferFrom(msg.sender, address(this), _rounds[currentRound].baseTicketPrice);
+    currencyToken.transferFrom(msg.sender, address(this), _rounds[currentRound].baseTicketPrice);
     emit Ticket6(currentRound, msg.sender, ticketId, numbers, referralCode);
   }
 
@@ -657,7 +664,7 @@ contract Lottery is
     uint256 ownerRevenue = getOwnerRevenue();
     _createNewRound();
     _open = true;
-    CURRENCY_TOKEN.transfer(owner(), ownerRevenue);
+    currencyToken.transfer(owner(), ownerRevenue);
     emit Draw(roundNumber, round.totalCombinations, round.numbers, round.winners, round.prizes);
   }
 
@@ -718,7 +725,7 @@ contract Lottery is
       revert PrizeAlreadyWithdrawnError(ticketId);
     }
     ticket.withdrawBlockNumber = block.number;
-    CURRENCY_TOKEN.transfer(player, prize);
+    currencyToken.transfer(player, prize);
     emit PrizeWithdrawal(ticketId, player, prize);
   }
 }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/governance/TimelockController.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -23,6 +24,11 @@ contract LotteryController is TimelockController, Pausable, ReentrancyGuard {
   ) TimelockController(0 seconds, proposers, executors, msg.sender) {
     token = _token;
     lottery = _lottery;
+  }
+
+  /// @notice Returns the ERC-20 token used for payments and prizes.
+  function currencyToken() public view returns (IERC20) {
+    return lottery.currencyToken();
   }
 
   /// @notice Pauses both the lottery and the controller. For emergency response.

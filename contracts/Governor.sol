@@ -22,7 +22,7 @@ contract LotteryGovernor is
     ERC20Votes token,
     LotteryController controller
   )
-    Governor("LotteryGovernor")
+    Governor("ExaLotto")
     GovernorSettings(/*votingDelay=*/ 0, /*votingPeriod=*/ 600, /*proposalThreshold=*/ 1e7 ether)
     GovernorVotes(token)
     GovernorVotesQuorumFraction(4)
