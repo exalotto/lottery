@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
+import "@openzeppelin/contracts/interfaces/IERC1363Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -28,6 +29,7 @@ uint32 constant VRF_CALLBACK_GAS_LIMIT = 1000000;
 
 contract Lottery is
   Initializable,
+  IERC1363Receiver,
   UUPSUpgradeable,
   OwnableUpgradeable,
   PausableUpgradeable,
@@ -279,6 +281,22 @@ contract Lottery is
     _rounds[currentRound].prizes[4] += value - stash;
     _rounds[currentRound].stash += stash;
     CURRENCY_TOKEN.transferFrom(source, address(this), value);
+  }
+
+  /// @notice Accept funding via the ERC-1363 interface. This only works if the `CURRENCY_TOKEN`
+  ///   supports ERC-1363. To trigger such a transfer, the user has to invoke `transferAndCall` on
+  ///   the token rather than `transfer`. The opaque `data` argument is ignored.
+  function onTransferReceived(
+    address /*operator*/,
+    address /*from*/,
+    uint256 value,
+    bytes calldata /*data*/
+  ) external override whenNotPaused nonReentrant returns (bytes4) {
+    uint currentRound = getCurrentRound();
+    uint256 stash = (value * 60) / 248;
+    _rounds[currentRound].prizes[4] += value - stash;
+    _rounds[currentRound].stash += stash;
+    return bytes4(keccak256("onTransferReceived(address,address,uint256,bytes)"));
   }
 
   /// @notice Returns the latest prizes for each winning category. The value returned at index 0 is
