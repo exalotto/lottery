@@ -18,8 +18,9 @@ struct TicketData {
   /// @dev The number of numbers in the ticket, e.g. 6 for a 6-number ticket. Note that `hash` is
   ///   the product of `cardinality` different primes.
   uint16 cardinality;
-  /// @dev Whether or not the prize attributed to the ticket has been withdrawn by the user.
-  bool withdrawn;
+  /// @dev Number of the block containing the transaction where the user withdrew the prize for this
+  ///   ticket. This field is initially 0, meaning the prize has not been withdrawn.
+  uint256 withdrawBlockNumber;
 }
 
 error InvalidTicketIdError(uint ticketId);

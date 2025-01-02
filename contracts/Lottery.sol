@@ -404,7 +404,7 @@ contract Lottery is
         id: uint64(ticketId),
         round: uint32(currentRound),
         cardinality: uint16(numbers.length),
-        withdrawn: false
+        withdrawBlockNumber: 0
       })
     );
     playersByTicket.push(msg.sender);
@@ -439,7 +439,7 @@ contract Lottery is
         id: uint64(ticketId),
         round: uint32(currentRound),
         cardinality: 6,
-        withdrawn: false
+        withdrawBlockNumber: 0
       })
     );
     playersByTicket.push(msg.sender);
@@ -679,13 +679,14 @@ contract Lottery is
   ///   the current round.
   /// @return player The address the prize can be sent to.
   /// @return prize The prize won by the ticket.
-  /// @return withdrawn Whether the prize has been withdrawn by the user.
+  /// @return withdrawBlockNumber The number of the block containing the transaction where the user
+  ///   withdrew the prize for the ticket, or 0 if the prize hasn't been withdrawn yet.
   function getTicketPrize(
     uint ticketId
-  ) public view returns (address player, uint256 prize, bool withdrawn) {
+  ) public view returns (address player, uint256 prize, uint256 withdrawBlockNumber) {
     TicketData storage ticket;
     (player, ticket, prize) = _getPrizeData(ticketId);
-    withdrawn = ticket.withdrawn;
+    withdrawBlockNumber = ticket.withdrawBlockNumber;
   }
 
   /// @notice Allows a user to withdraw the prize won by the specified ticket. Reverts if the ticket
@@ -695,10 +696,10 @@ contract Lottery is
     if (prize == 0) {
       revert NoPrizeError(ticketId);
     }
-    if (ticket.withdrawn) {
+    if (ticket.withdrawBlockNumber != 0) {
       revert PrizeAlreadyWithdrawnError(ticketId);
     }
-    ticket.withdrawn = true;
+    ticket.withdrawBlockNumber = block.number;
     CURRENCY_TOKEN.transfer(player, prize);
     emit PrizeWithdrawal(ticketId, player, prize);
   }
