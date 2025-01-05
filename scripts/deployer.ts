@@ -195,11 +195,20 @@ export class Deployer {
     return { token, lottery, controller, governor };
   }
 
-  public async deployICO(token: LotteryToken, lottery: Lottery): Promise<LotteryICO> {
-    const ico = await deploy<LotteryICO>(
-      'LotteryICO',
-      await Promise.all([token.getAddress(), lottery.getAddress()]),
-    );
+  public async deployICO(
+    currencyTokenAddress: string,
+    token: LotteryToken,
+    lottery: Lottery,
+  ): Promise<LotteryICO> {
+    const [tokenAddress, lotteryAddress] = await Promise.all([
+      token.getAddress(),
+      lottery.getAddress(),
+    ]);
+    const ico = await deploy<LotteryICO>('LotteryICO', [
+      currencyTokenAddress,
+      tokenAddress,
+      lotteryAddress,
+    ]);
     const icoAddress = await ico.getAddress();
     let tx = await send(token, 'transfer', icoAddress, await token.totalSupply());
     console.log(`Total EXL supply transferred to ${icoAddress} -- txid ${tx.hash}`);
@@ -224,7 +233,7 @@ export class Deployer {
     const { lottery } = await this.deployLottery(currencyTokenAddress, vrfCoordinatorAddress);
     const controller = await this.deployController(token, lottery);
     const governor = await this.deployGovernor(token, controller);
-    const ico = await this.deployICO(token, lottery);
+    const ico = await this.deployICO(currencyTokenAddress, token, lottery);
     return { token, lottery, controller, governor, ico };
   }
 }
