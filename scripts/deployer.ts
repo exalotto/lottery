@@ -48,7 +48,7 @@ export class Deployer {
     const token = await this._deployToken();
     if (this._deployer !== this._owner) {
       const totalSupply = await token.totalSupply();
-      let tx = await send(token, 'transfer', this._owner, totalSupply);
+      const tx = await send(token, 'transfer', this._owner, totalSupply);
       console.log(`Total EXL supply transferred to ${this._owner} -- txid ${tx.hash}`);
     }
     return token;
