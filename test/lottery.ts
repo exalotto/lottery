@@ -77,7 +77,7 @@ describe('Lottery', () => {
   const buyTicket = (numbers: number[], referralCode: string = NULL_REFERRAL_CODE) =>
     buyTicketFor(player, numbers, referralCode);
 
-  const draw = async () => {
+  const draw123456 = async () => {
     await lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!);
     await vrfCoordinator.fulfillRandomWordsWithOverride(
       requestId++,
@@ -276,7 +276,7 @@ describe('Lottery', () => {
       const value = price * 3n - ((price * 3n) / 10n) * 2n;
       const prize = (value * 188n) / 1000n;
       const stash = value - prize * 5n;
-      await draw();
+      await draw123456();
       expect(await lottery.getPrizes()).to.deep.equal([prize, 0n, prize, 0n, prize]);
       expect(await lottery.getJackpot()).to.equal(prize);
       expect(await lottery.getStash()).to.equal(stash);
@@ -293,7 +293,7 @@ describe('Lottery', () => {
       const value = price * 3n - ((price * 3n) / 10n) * 2n;
       const prize = (value * 188n) / 1000n;
       const stash = value - prize * 5n;
-      await draw();
+      await draw123456();
       expect(await lottery.getPrizes()).to.deep.equal([0n, prize, 0n, prize, stash]);
       expect(await lottery.getJackpot()).to.equal(stash);
       expect(await lottery.getStash()).to.equal(0);
@@ -318,7 +318,7 @@ describe('Lottery', () => {
       const prize = (value * 188n) / 1000n;
       const stash = value - prize * 5n;
       const block = await time.latestBlock();
-      await draw();
+      await draw123456();
       await expect(lottery.getRoundData(0)).to.be.reverted;
       const data = await lottery.getRoundData(1);
       expect(data.baseTicketPrice).to.equal(price);
@@ -342,7 +342,7 @@ describe('Lottery', () => {
       const prize1 = (value1 * 188n) / 1000n;
       const stash1 = value1 - prize1 * 5n;
       const block1 = await time.latestBlock();
-      await draw();
+      await draw123456();
       await advanceTimeToNextDrawing();
       await buyTicket([21, 22, 23, 24, 25, 26]);
       await buyTicket([1, 2, 3, 14, 15, 16]);
@@ -352,7 +352,7 @@ describe('Lottery', () => {
       const prize2 = (value2 * 188n) / 1000n;
       const stash2 = value2 - prize2 * 5n;
       const block2 = await time.latestBlock();
-      await draw();
+      await draw123456();
       const data1 = await lottery.getRoundData(1);
       expect(data1.baseTicketPrice).to.equal(price1);
       expect(data1.prizes).to.deep.equal([prize1, prize1, prize1, prize1, prize1]);
@@ -435,14 +435,14 @@ describe('Lottery', () => {
     });
 
     it('only one draw per window', async () => {
-      await draw();
+      await draw123456();
       await advanceTime(ONE_HOUR);
       await expect(lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!)).to.be
         .reverted;
     });
 
     it('skip a draw', async () => {
-      await draw();
+      await draw123456();
       await advanceTime(ONE_HOUR);
       await advanceTimeToNextDrawing();
       await advanceTime(THREE_DAYS);
@@ -521,7 +521,7 @@ describe('Lottery', () => {
   describe('matches', () => {
     it('1 ticket, 0 matches', async () => {
       await buyTicket([10, 11, 12, 13, 14, 15]);
-      await draw();
+      await draw123456();
       const [, , , , , , , , winners] = await lottery.getRoundData(1);
       expect(winners).to.deep.equal([0, 0, 0, 0, 0]);
       const [, ticketPrize] = await lottery.getTicketPrize(1);
@@ -530,7 +530,7 @@ describe('Lottery', () => {
 
     it('1 ticket, 1 match', async () => {
       await buyTicket([1, 12, 13, 14, 15, 16]);
-      await draw();
+      await draw123456();
       const [, , , , , , , , winners] = await lottery.getRoundData(1);
       expect(winners).to.deep.equal([0, 0, 0, 0, 0]);
       const [, ticketPrize] = await lottery.getTicketPrize(1);
@@ -542,14 +542,496 @@ describe('Lottery', () => {
       const value = price - (price / 10n) * 2n;
       const prize = (value * 188n) / 1000n;
       await buyTicket([1, 2, 13, 14, 15, 16]);
-      await draw();
+      await draw123456();
       const [, , , , , , , , winners] = await lottery.getRoundData(1);
       expect(winners).to.deep.equal([1, 0, 0, 0, 0]);
       const [, ticketPrize] = await lottery.getTicketPrize(1);
       expect(ticketPrize).to.equal(prize);
     });
 
-    // TODO
+    it('1 ticket, 3 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = price - (price / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 1, 0, 0, 0]);
+      const [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('1 ticket, 4 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = price - (price / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 4, 15, 16]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 1, 0, 0]);
+      const [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('1 ticket, 5 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = price - (price / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 4, 5, 16]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 1, 0]);
+      const [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('1 ticket, 6 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = price - (price / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 4, 5, 6]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 0, 1]);
+      const [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 0 and 0 matches', async () => {
+      await buyTicket([11, 12, 13, 14, 15, 16]);
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(0);
+    });
+
+    it('2 tickets, 0 and 1 matches', async () => {
+      await buyTicket([11, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 22, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(0);
+    });
+
+    it('2 tickets, 0 and 2 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([11, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 0 and 3 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([11, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 1, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 0 and 4 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([11, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 1, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 0 and 5 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([11, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 1, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 0 and 6 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([11, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 6]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 0, 1]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 1 and 0 matches', async () => {
+      await buyTicket([1, 12, 13, 14, 15, 16]);
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(0);
+    });
+
+    it('2 tickets, 1 and 1 matches', async () => {
+      await buyTicket([1, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 22, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(0);
+    });
+
+    it('2 tickets, 1 and 2 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 1 and 3 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 1, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 1 and 4 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 1, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 1 and 5 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 1, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 1 and 6 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 12, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 6]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 0, 0, 0, 1]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(0);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 2 and 0 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(0);
+    });
+
+    it('2 tickets, 2 and 1 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([1, 22, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(0);
+    });
+
+    it('2 tickets, 2 and 2 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n / 2n;
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([2, 0, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 2 and 3 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 1, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 2 and 4 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 0, 1, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 2 and 5 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 0, 0, 1, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 2 and 6 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 6]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 0, 0, 0, 1]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 3 and 0 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 1, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(0);
+    });
+
+    it('2 tickets, 3 and 1 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 22, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 1, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(0);
+    });
+
+    it('2 tickets, 3 and 2 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 2, 23, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([1, 1, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 3 and 3 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n / 2n;
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 24, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 2, 0, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 3 and 4 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 25, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 1, 1, 0, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 3 and 5 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 26]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 1, 0, 1, 0]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
+
+    it('2 tickets, 3 and 6 matches', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = (price - (price / 10n) * 2n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 6]);
+      await draw123456();
+      const [, , , , , , , , winners] = await lottery.getRoundData(1);
+      expect(winners).to.deep.equal([0, 1, 0, 0, 1]);
+      let ticketPrize;
+      [, ticketPrize] = await lottery.getTicketPrize(1);
+      expect(ticketPrize).to.equal(prize);
+      [, ticketPrize] = await lottery.getTicketPrize(2);
+      expect(ticketPrize).to.equal(prize);
+    });
   });
 
   describe('prizes', () => {
@@ -558,7 +1040,7 @@ describe('Lottery', () => {
       const value = price - (price / 10n) * 2n;
       const prize = (value * 188n) / 1000n;
       await buyTicket([1, 2, 3, 14, 15, 16]);
-      await draw();
+      await draw123456();
       let ticket = await lottery.getTicketPrize(1);
       expect(ticket.player).to.equal(await player.getAddress());
       expect(ticket.prize).to.equal(prize);
@@ -577,7 +1059,7 @@ describe('Lottery', () => {
       const value = price - (price / 10n) * 2n;
       const prize = (value * 188n) / 1000n;
       await buyTicket([1, 2, 3, 14, 15, 16]);
-      await draw();
+      await draw123456();
       const block = await time.latestBlock();
       await lottery.withdrawPrize(1);
       await expect(lottery.withdrawPrize(1)).to.be.reverted;
@@ -593,7 +1075,7 @@ describe('Lottery', () => {
       const prize = (value * 188n) / 1000n;
       await buyTicket([1, 2, 13, 14, 15, 16]);
       await buyTicket([1, 2, 3, 14, 15, 16]);
-      await draw();
+      await draw123456();
       await lottery.withdrawPrize(1);
       let ticket2 = await lottery.getTicketPrize(2);
       expect(ticket2.player).to.equal(await player.getAddress());
@@ -620,7 +1102,7 @@ describe('Lottery', () => {
       await buyTicket([1, 2, 3, 4, 15, 16, 17]);
       await buyTicket([1, 2, 3, 14, 15, 16]);
       const block = await time.latestBlock();
-      await draw();
+      await draw123456();
       const data = await lottery.getRoundData(1);
       expect(data.baseTicketPrice).to.equal(price);
       expect(data.prizes).to.deep.equal([prize, prize, prize, prize, prize]);
@@ -653,7 +1135,7 @@ describe('Lottery', () => {
       await buyTicket([1, 2, 3, 4, 15, 16, 17, 18]);
       await buyTicket([1, 2, 3, 14, 15, 16]);
       const block = await time.latestBlock();
-      await draw();
+      await draw123456();
       const data = await lottery.getRoundData(1);
       expect(data.baseTicketPrice).to.equal(price);
       expect(data.prizes).to.deep.equal([prize, prize, prize, prize, prize]);

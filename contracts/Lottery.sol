@@ -108,7 +108,9 @@ contract Lottery is
 
   error ReferralCodeAlreadyExistsError(bytes32 referralCode);
   error SalesAreClosedError();
+  error InvalidNumberError(uint8 number);
   error InvalidNumbersError(uint8[] numbers);
+  error DuplicateNumberError(uint8 number);
   error InvalidReferralCodeError(bytes32 referralCode);
   error InvalidRoundNumberError(uint round);
   error InvalidStateError();
@@ -239,11 +241,11 @@ contract Lottery is
     }
     for (uint i = 0; i < numbers.length; i++) {
       if (numbers[i] < 1 || numbers[i] > 90) {
-        revert InvalidNumbersError(numbers);
+        revert InvalidNumberError(numbers[i]);
       }
       for (uint j = i + 1; j < numbers.length; j++) {
         if (numbers[i] == numbers[j]) {
-          revert InvalidNumbersError(numbers);
+          revert DuplicateNumberError(numbers[i]);
         }
       }
     }
@@ -397,12 +399,12 @@ contract Lottery is
     return _getCurrentRoundData().baseTicketPrice * _choose6(numbers.length);
   }
 
-  /// @notice Creates a lottery ticket. The ticket will be associated to `msg.sender`, which will be
-  ///   the only account able to withdraw any prizes attributed to the ticket. The price of the
-  ///   ticket can be queried beforehand with `getTicketPrice`, and the `createTicket` function will
-  ///   try to transfer that amount of the `currencyToken` from `msg.sender` to the lottery
-  ///   contract, reverting if the transfer fails. Be sure the correct amount is approved before
-  ///   invoking `createTicket`.
+  /// @notice Creates a lottery ticket in the current round. The ticket will be associated to
+  ///   `msg.sender`, which will be the only account able to withdraw the prize attributed to the
+  ///   ticket. The price of the ticket can be queried beforehand with `getTicketPrice`, and the
+  ///   `createTicket` function will try to transfer that amount of the `currencyToken` from
+  ///   `msg.sender` to the lottery contract, reverting if the transfer fails. Be sure the correct
+  ///   amount is approved before invoking `createTicket`.
   /// @param referralCode An optional referral code. If specified it must be valid, i.e. it must
   ///   have been claimed with `claimReferralCode` or `makeReferralCode`. When a non-zero referral
   ///   code is provided the referrer will get a small share of the ticket price.
