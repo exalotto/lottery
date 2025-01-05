@@ -268,7 +268,7 @@ describe('ICO', () => {
       expect(await ico.balanceOf(partner2)).to.equal(0);
     });
 
-    it('liquid withdraw', async () => {
+    it('liquid withdrawal', async () => {
       await ico.open(12345, price1);
       await buyTokens1(partner1, 123);
       await buyTokens1(partner1, 321);
@@ -357,8 +357,8 @@ describe('ICO', () => {
   describe('second round', () => {
     beforeEach(async () => {
       await ico.open(12345, price1);
-      await buyTokens2(partner1, 123);
-      await buyTokens2(partner2, 321);
+      await buyTokens1(partner1, 123);
+      await buyTokens1(partner2, 321);
       await ico.close();
       await ico.connect(partner1).withdraw(100);
       await ico.connect(partner2).withdraw(100);
@@ -482,6 +482,156 @@ describe('ICO', () => {
       expect(await ico.balanceOf(partner2)).to.equal(221);
     });
 
-    // TODO
+    it('both buy and close', async () => {
+      await buyTokens2(partner1, 321);
+      await buyTokens2(partner2, 123);
+      await ico.close();
+      const value1 = getPrice1(123) + getPrice1(321);
+      const value2 = getPrice2(321) + getPrice2(123);
+      const value = value1 + value2;
+      const stash = (value1 * 60n) / 248n + (value2 * 60n) / 248n;
+      expect(await currencyToken.balanceOf(icoAddress)).to.equal(0);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value);
+      expect(await lottery.getJackpot()).to.equal(value - stash);
+      expect(await lottery.getStash()).to.equal(stash);
+      expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 200n);
+      expect(await ico.tokensForSale()).to.equal(54321);
+      expect(await ico.tokensSold()).to.equal(321 + 123);
+      expect(await ico.isOpen()).to.equal(false);
+      expect(await ico.balanceOf(owner)).to.equal(0);
+      expect(await ico.balanceOf(partner1)).to.equal(344);
+      expect(await ico.balanceOf(partner2)).to.equal(344);
+    });
+
+    it('buy many and close', async () => {
+      await buyTokens2(partner1, 321);
+      await buyTokens2(partner1, 123);
+      await buyTokens2(partner2, 456);
+      await ico.close();
+      const value1 = getPrice1(123) + getPrice1(321);
+      const value2 = getPrice2(321) + getPrice2(123) + getPrice2(456);
+      const value = value1 + value2;
+      const stash = (value1 * 60n) / 248n + (value2 * 60n) / 248n;
+      expect(await currencyToken.balanceOf(icoAddress)).to.equal(0);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value);
+      expect(await lottery.getJackpot()).to.equal(value - stash);
+      expect(await lottery.getStash()).to.equal(stash);
+      expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 200n);
+      expect(await ico.tokensForSale()).to.equal(54321);
+      expect(await ico.tokensSold()).to.equal(321 + 123 + 456);
+      expect(await ico.isOpen()).to.equal(false);
+      expect(await ico.balanceOf(owner)).to.equal(0);
+      expect(await ico.balanceOf(partner1)).to.equal(467);
+      expect(await ico.balanceOf(partner2)).to.equal(677);
+    });
+
+    it('withdraw', async () => {
+      await buyTokens2(partner1, 123);
+      await ico.close();
+      await ico.connect(partner1).withdraw(12);
+      const value1 = getPrice1(123) + getPrice1(321);
+      const value2 = getPrice2(123);
+      const value = value1 + value2;
+      const stash = (value1 * 60n) / 248n + (value2 * 60n) / 248n;
+      expect(await currencyToken.balanceOf(icoAddress)).to.equal(0);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value);
+      expect(await lottery.getJackpot()).to.equal(value - stash);
+      expect(await lottery.getStash()).to.equal(stash);
+      expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 212n);
+      expect(await token.balanceOf(owner)).to.equal(0);
+      expect(await token.balanceOf(partner1)).to.equal(112);
+      expect(await token.balanceOf(partner2)).to.equal(100);
+      expect(await ico.isOpen()).to.equal(false);
+      expect(await ico.balanceOf(owner)).to.equal(0);
+      expect(await ico.balanceOf(partner1)).to.equal(134);
+      expect(await ico.balanceOf(partner2)).to.equal(221);
+    });
+
+    it('liquid withdrawal', async () => {
+      await buyTokens2(partner1, 123);
+      await buyTokens2(partner1, 321);
+      await ico.close();
+      await ico.connect(partner1).withdraw(200);
+      const value1 = getPrice1(123) + getPrice1(321);
+      const value2 = getPrice2(123) + getPrice2(321);
+      const value = value1 + value2;
+      const stash = (value1 * 60n) / 248n + (value2 * 60n) / 248n;
+      expect(await currencyToken.balanceOf(icoAddress)).to.equal(0);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value);
+      expect(await lottery.getJackpot()).to.equal(value - stash);
+      expect(await lottery.getStash()).to.equal(stash);
+      expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 400n);
+      expect(await token.balanceOf(owner)).to.equal(0);
+      expect(await token.balanceOf(partner1)).to.equal(300);
+      expect(await token.balanceOf(partner2)).to.equal(100);
+      expect(await ico.isOpen()).to.equal(false);
+      expect(await ico.balanceOf(owner)).to.equal(0);
+      expect(await ico.balanceOf(partner1)).to.equal(267);
+      expect(await ico.balanceOf(partner2)).to.equal(221);
+    });
+
+    it('both withdraw', async () => {
+      await buyTokens2(partner1, 123);
+      await buyTokens2(partner1, 321);
+      await buyTokens2(partner2, 456);
+      await buyTokens2(partner2, 654);
+      await ico.close();
+      await ico.connect(partner1).withdraw(300);
+      await ico.connect(partner2).withdraw(500);
+      const value1 = getPrice1(123) + getPrice1(321);
+      const value2 = getPrice2(123) + getPrice2(321) + getPrice2(456) + getPrice2(654);
+      const value = value1 + value2;
+      const stash = (value1 * 60n) / 248n + (value2 * 60n) / 248n;
+      expect(await currencyToken.balanceOf(icoAddress)).to.equal(0);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value);
+      expect(await lottery.getJackpot()).to.equal(value - stash);
+      expect(await lottery.getStash()).to.equal(stash);
+      expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 1000n);
+      expect(await token.balanceOf(owner)).to.equal(0);
+      expect(await token.balanceOf(partner1)).to.equal(400);
+      expect(await token.balanceOf(partner2)).to.equal(600);
+      expect(await ico.isOpen()).to.equal(false);
+      expect(await ico.balanceOf(owner)).to.equal(0);
+      expect(await ico.balanceOf(partner1)).to.equal(167);
+      expect(await ico.balanceOf(partner2)).to.equal(831);
+    });
+
+    it('cannot withdraw more than balance', async () => {
+      await buyTokens2(partner1, 123);
+      await buyTokens2(partner1, 321);
+      await buyTokens2(partner2, 456);
+      await buyTokens2(partner2, 654);
+      await ico.close();
+      await expect(ico.connect(partner1).withdraw(1000)).to.be.reverted;
+    });
+
+    it('withdraw all', async () => {
+      await buyTokens2(partner1, 123);
+      await buyTokens2(partner1, 321);
+      await ico.close();
+      await ico.connect(partner1).withdrawAll();
+      const value1 = getPrice1(123) + getPrice1(321);
+      const value2 = getPrice2(123) + getPrice2(321);
+      const value = value1 + value2;
+      const stash = (value1 * 60n) / 248n + (value2 * 60n) / 248n;
+      expect(await currencyToken.balanceOf(icoAddress)).to.equal(0);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value);
+      expect(await lottery.getJackpot()).to.equal(value - stash);
+      expect(await lottery.getStash()).to.equal(stash);
+      expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 667n);
+      expect(await token.balanceOf(owner)).to.equal(0);
+      expect(await token.balanceOf(partner1)).to.equal(567);
+      expect(await token.balanceOf(partner2)).to.equal(100);
+      expect(await ico.isOpen()).to.equal(false);
+      expect(await ico.balanceOf(owner)).to.equal(0);
+      expect(await ico.balanceOf(partner1)).to.equal(0);
+      expect(await ico.balanceOf(partner2)).to.equal(221);
+    });
+
+    it('withdraw nothing', async () => {
+      await ico.close();
+      await ico.connect(partner1).withdrawAll();
+      await expect(ico.connect(partner1).withdrawAll()).to.be.reverted;
+    });
   });
 });
