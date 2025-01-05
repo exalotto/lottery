@@ -3,14 +3,17 @@ pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./Lottery.sol";
 import "./Token.sol";
 
-contract LotteryICO is Ownable, ReentrancyGuard {
+contract LotteryICO is Ownable, Pausable, ReentrancyGuard {
   error InvalidStateError();
   error InsufficientTokensError(uint256 available, uint256 requested);
+  error IncorrectValueError(uint256 got, uint256 want);
+  error InsufficientBalanceError(uint256 amount, uint256 balance);
 
   /// @notice Address of the ERC-20 token used for buying EXL and eventually for lottery prizes.
   IERC20 public immutable currencyToken;
@@ -21,11 +24,14 @@ contract LotteryICO is Ownable, ReentrancyGuard {
   /// @notice Address of the lottery smartcontract.
   Lottery public immutable lottery;
 
-  /// @dev How many EXL-wei are being sold.
-  uint256 private _tokensForSale = 0;
+  /// @dev How many EXL-wei are being sold at this round.
+  uint256 public tokensForSale = 0;
+
+  /// @dev How many EXL-wei have been sold so far.
+  uint256 public tokensSold = 0;
 
   /// @dev Price of 1 EXL in wei.
-  uint256 private _price;
+  uint256 public price;
 
   /// @dev True iff token sales are open.
   bool private _open = false;
@@ -53,31 +59,32 @@ contract LotteryICO is Ownable, ReentrancyGuard {
     lottery = _lottery;
   }
 
+  /// @notice For emergency response.
+  function pause() public onlyOwner {
+    _pause();
+  }
+
+  /// @notice For emergency response.
+  function unpause() public onlyOwner {
+    _unpause();
+  }
+
   /// @return True iff token sales are open.
   function isOpen() public view returns (bool) {
     return _open;
   }
 
-  /// @return The price of 1 EXL in wei.
-  function getTokenPrice() public view whenOpen returns (uint256) {
-    return _price;
-  }
-
-  /// @return How many EXL-wei are for sale.
-  function getTokensForSale() public view whenOpen returns (uint256) {
-    return _tokensForSale;
-  }
-
   /// @notice Opens the token sale.
-  /// @param tokensForSale How many EXL-wei can be sold.
-  /// @param price The price of 1 EXL in wei.
-  function open(uint256 tokensForSale, uint256 price) public onlyOwner whenClose {
+  /// @param tokensToSell How many EXL-wei can be sold.
+  /// @param _price The price of 1 EXL in wei.
+  function open(uint256 tokensToSell, uint256 _price) public onlyOwner whenClose nonReentrant {
     uint256 balance = token.balanceOf(address(this));
-    if (tokensForSale > balance) {
-      revert InsufficientTokensError(balance, tokensForSale);
+    if (tokensToSell > balance) {
+      revert InsufficientTokensError(balance, tokensToSell);
     }
-    _tokensForSale = tokensForSale;
-    _price = price;
+    tokensForSale = tokensToSell;
+    tokensSold = 0;
+    price = _price;
     _open = true;
   }
 
@@ -95,9 +102,44 @@ contract LotteryICO is Ownable, ReentrancyGuard {
   }
 
   /// @return The price in wei of the specified amount of EXL-wei.
-  function getPrice(uint256 tokenAmount) public view whenOpen returns (uint256) {
-    return (_price * tokenAmount) / (10 ** token.decimals());
+  function getPriceFor(uint256 tokenAmount) public view whenOpen returns (uint256) {
+    return (price * tokenAmount) / (10 ** token.decimals());
   }
 
-  // TODO
+  /// @notice Buys the requested `amount` of EXL-wei and attributes them to the sender, reverting if
+  ///   the token sale is close. An amount of `getPriceFor(amount)` wei of the currency token must
+  ///   have been approved beforehand, otherwise the transaction will fail. Note that the acquired
+  ///   EXL tokens are not yet transferred at this time, they're only associated with `msg.sender`.
+  ///   This method can be invoked multiple times by the same caller and all acquired amounts will
+  ///   add up. The EXL balance of an account can be retrieved by calling `balanceOf`.
+  function buyTokens(uint256 amount) public whenOpen whenNotPaused nonReentrant {
+    if (tokensSold + amount > tokensForSale) {
+      revert InsufficientTokensError(tokensForSale, amount);
+    }
+    tokensSold += amount;
+    _balances[msg.sender] += amount;
+    currencyToken.transferFrom(msg.sender, address(this), getPriceFor(amount));
+  }
+
+  /// @notice Transfers the requested EXL-wei `amount` to the sender, reverting if the token sale is
+  ///   still open or if `amount > balanceOf(msg.sender)`.
+  function withdraw(uint256 amount) public whenClose whenNotPaused nonReentrant {
+    uint256 balance = _balances[msg.sender];
+    if (amount > balance) {
+      revert InsufficientBalanceError(amount, balance);
+    }
+    _balances[msg.sender] -= amount;
+    token.transfer(msg.sender, amount);
+  }
+
+  /// @notice Transfers all EXL balance (as per `balanceOf(msg.sender)`) to the sender. Reverts if
+  ///   the token sale is still open.
+  function withdrawAll() public whenClose whenNotPaused nonReentrant {
+    uint256 balance = _balances[msg.sender];
+    if (balance == 0) {
+      revert InsufficientBalanceError(0, 0);
+    }
+    _balances[msg.sender] = 0;
+    token.transfer(msg.sender, balance);
+  }
 }
