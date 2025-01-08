@@ -15,6 +15,9 @@ import type {
 
 import { deploy, deployWithProxy, getDefaultSigner, send } from './utils';
 
+// We use Dai and this is in wei, so it's $1.50.
+const INITIAL_TICKET_PRICE = 1500000000000000000n;
+
 export class Deployer {
   private _signers: string[] = [];
   private _deployer: string | null = null;
@@ -103,7 +106,7 @@ export class Deployer {
     ]);
     const lottery = await deployWithProxy<Lottery>(
       'Lottery',
-      [currencyToken, vrfCoordinatorAddress],
+      [currencyToken, vrfCoordinatorAddress, INITIAL_TICKET_PRICE],
       {
         Drawing: drawingLibraryAddress,
         TicketIndex: indexLibraryAddress,

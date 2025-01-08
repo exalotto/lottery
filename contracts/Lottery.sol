@@ -16,9 +16,6 @@ import "./Drawing.sol";
 import "./TicketIndex.sol";
 import "./UserTickets.sol";
 
-/// @dev Since we use Dai, this is set to $1.50.
-uint constant INITIAL_TICKET_PRICE = 150e-2 ether;
-
 /// @dev The ChainLink VRF will wait for this number of block confirmations before invoking our
 ///   callback with the randomness.
 uint16 constant VRF_REQUEST_CONFIRMATIONS = 10;
@@ -176,11 +173,12 @@ contract Lottery is
 
   function __Lottery_init_unchained(
     IERC20 _currencyToken,
-    VRFCoordinatorV2Interface _vrfCoordinator
+    VRFCoordinatorV2Interface _vrfCoordinator,
+    uint256 initialTicketPrice
   ) private onlyInitializing {
     currencyToken = _currencyToken;
     vrfCoordinator = _vrfCoordinator;
-    _baseTicketPrice = INITIAL_TICKET_PRICE;
+    _baseTicketPrice = initialTicketPrice;
     playersByTicket.push(); // skip slot 0 because ticket ID 0 is invalid
     _rounds.push(); // skip slot 0 because round 0 is invalid
     _rounds.push(); // initialize first round
@@ -193,13 +191,14 @@ contract Lottery is
 
   function initialize(
     IERC20 _currencyToken,
-    VRFCoordinatorV2Interface _vrfCoordinator
+    VRFCoordinatorV2Interface _vrfCoordinator,
+    uint256 initialTicketPrice
   ) public initializer {
     __UUPSUpgradeable_init();
     __Ownable_init(msg.sender);
     __Pausable_init();
     __ReentrancyGuard_init();
-    __Lottery_init_unchained(_currencyToken, _vrfCoordinator);
+    __Lottery_init_unchained(_currencyToken, _vrfCoordinator, initialTicketPrice);
   }
 
   function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
