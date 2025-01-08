@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -15,6 +16,8 @@ contract LotteryController is TimelockController, Pausable, ReentrancyGuard {
     uint256 value;
     uint256 totalValue;
   }
+
+  using SafeERC20 for IERC20;
 
   /// @notice Address of the EXL token.
   LotteryToken public immutable token;
@@ -162,6 +165,6 @@ contract LotteryController is TimelockController, Pausable, ReentrancyGuard {
     require(amount > 0, "no revenue is available for withdrawal");
     _totalWithdrawn += amount;
     lastWithdrawalBlock[account] = _revenue[_revenue.length - 1].blockNumber;
-    currencyToken().transfer(account, amount);
+    currencyToken().safeTransfer(account, amount);
   }
 }

@@ -4,7 +4,7 @@ import { ethers } from 'hardhat';
 import type { SnapshotRestorer } from '@nomicfoundation/hardhat-network-helpers';
 import { takeSnapshot, time } from '@nomicfoundation/hardhat-network-helpers';
 
-import type { Signer } from 'ethers';
+import type { Signer, TypedDataDomain } from 'ethers';
 import type { FakeToken, Lottery, MockVRFCoordinator } from '../typechain-types';
 
 import { Deployer } from '../scripts/deployer';
@@ -25,6 +25,7 @@ describe('Lottery', () => {
   let owner: Signer;
   let partner: Signer;
   let player: Signer;
+  let playerAddress: string;
 
   let currencyToken: FakeToken;
   let vrfCoordinator: MockVRFCoordinator;
@@ -39,6 +40,7 @@ describe('Lottery', () => {
   before(async () => {
     await deployer.init();
     [owner, partner, player] = await ethers.getSigners();
+    playerAddress = await player.getAddress();
     currencyToken = await deployer.deployFakeTokenForTesting();
     vrfCoordinator = await deployer.deployMockVRFCoordinator();
     await vrfCoordinator.createSubscription();
@@ -77,16 +79,64 @@ describe('Lottery', () => {
   const buyTicket = (numbers: number[], referralCode: string = NULL_REFERRAL_CODE) =>
     buyTicketFor(player, numbers, referralCode);
 
+  const signPermit = async (value: bigint) => {
+    const domain: TypedDataDomain = {
+      chainId: 31337,
+      name: await currencyToken.name(),
+      verifyingContract: await currencyToken.getAddress(),
+      version: '1',
+    };
+    const deadline = (await time.latest()) + ONE_HOUR;
+    const message = {
+      owner: playerAddress,
+      spender: lotteryAddress,
+      value,
+      nonce: await currencyToken.nonces(playerAddress),
+      deadline,
+    };
+    const types = {
+      Permit: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint256' },
+      ],
+    };
+    const signature = await player.signTypedData(domain, types, message);
+    const { r, s, v } = ethers.Signature.from(signature);
+    return { r, s, v, deadline };
+  };
+
+  const buyTicketWithPermit = async (
+    numbers: number[],
+    referralCode: string = NULL_REFERRAL_CODE,
+  ) => {
+    const price = await lottery.connect(player).getTicketPrice(numbers);
+    await currencyToken.connect(player).mint(price);
+    const { r, s, v, deadline } = await signPermit(price);
+    await lottery
+      .connect(player)
+      .createTicketWithPermit(referralCode, numbers, price, deadline, v, r, s);
+  };
+
+  const buyTicket6WithPermit = async (
+    numbers: number[],
+    referralCode: string = NULL_REFERRAL_CODE,
+  ) => {
+    const price = await lottery.connect(player).getTicketPrice(numbers);
+    await currencyToken.connect(player).mint(price);
+    const { r, s, v, deadline } = await signPermit(price);
+    await lottery
+      .connect(player)
+      .createTicket6WithPermit(referralCode, numbers, price, deadline, v, r, s);
+  };
+
   const draw123456 = async () => {
     await lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!);
-    await vrfCoordinator.fulfillRandomWordsWithOverride(
-      requestId++,
-      await lottery.getAddress(),
-      [0],
-      {
-        gasLimit: process.env.EXALOTTO_CALLBACK_GAS_LIMIT,
-      },
-    );
+    await vrfCoordinator.fulfillRandomWordsWithOverride(requestId++, lotteryAddress, [0], {
+      gasLimit: process.env.EXALOTTO_CALLBACK_GAS_LIMIT,
+    });
   };
 
   it('initial state', async () => {
@@ -1042,14 +1092,14 @@ describe('Lottery', () => {
       await buyTicket([1, 2, 3, 14, 15, 16]);
       await draw123456();
       let ticket = await lottery.getTicketPrize(1);
-      expect(ticket.player).to.equal(await player.getAddress());
+      expect(ticket.player).to.equal(playerAddress);
       expect(ticket.prize).to.equal(prize);
       expect(ticket.withdrawBlockNumber).to.equal(0);
       expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value);
       await lottery.withdrawPrize(1);
       expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value - prize);
       ticket = await lottery.getTicketPrize(1);
-      expect(ticket.player).to.equal(await player.getAddress());
+      expect(ticket.player).to.equal(playerAddress);
       expect(ticket.prize).to.equal(prize);
       expect(ticket.withdrawBlockNumber).to.equal(await time.latestBlock());
     });
@@ -1064,7 +1114,7 @@ describe('Lottery', () => {
       await lottery.withdrawPrize(1);
       await expect(lottery.withdrawPrize(1)).to.be.reverted;
       const ticket = await lottery.getTicketPrize(1);
-      expect(ticket.player).to.equal(await player.getAddress());
+      expect(ticket.player).to.equal(playerAddress);
       expect(ticket.prize).to.equal(prize);
       expect(ticket.withdrawBlockNumber).to.equal(block + 1);
     });
@@ -1078,12 +1128,12 @@ describe('Lottery', () => {
       await draw123456();
       await lottery.withdrawPrize(1);
       let ticket2 = await lottery.getTicketPrize(2);
-      expect(ticket2.player).to.equal(await player.getAddress());
+      expect(ticket2.player).to.equal(playerAddress);
       expect(ticket2.prize).to.equal(prize);
       expect(ticket2.withdrawBlockNumber).to.equal(0);
       await lottery.withdrawPrize(2);
       ticket2 = await lottery.getTicketPrize(2);
-      expect(ticket2.player).to.equal(await player.getAddress());
+      expect(ticket2.player).to.equal(playerAddress);
       expect(ticket2.prize).to.equal(prize);
       expect(ticket2.withdrawBlockNumber).to.equal(await time.latestBlock());
       expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value - prize * 2n);
@@ -1114,13 +1164,13 @@ describe('Lottery', () => {
       expect(data.closureBlockNumber).to.equal(block + 2);
       expect(data.winners).to.deep.equal([1, 5, 3, 0, 0]);
       let ticket = await lottery.getTicketPrize(2);
-      expect(ticket.player).to.equal(await player.getAddress());
+      expect(ticket.player).to.equal(playerAddress);
       expect(ticket.prize).to.equal((prize * 4n) / 5n + prize);
       expect(ticket.withdrawBlockNumber).to.equal(0);
       await lottery.withdrawPrize(2);
       expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value - ticket.prize);
       ticket = await lottery.getTicketPrize(2);
-      expect(ticket.player).to.equal(await player.getAddress());
+      expect(ticket.player).to.equal(playerAddress);
       expect(ticket.prize).to.equal((prize * 4n) / 5n + prize);
       expect(ticket.withdrawBlockNumber).to.equal(block + 3);
       await expect(lottery.withdrawPrize(2)).to.be.reverted;
@@ -1147,16 +1197,129 @@ describe('Lottery', () => {
       expect(data.closureBlockNumber).to.equal(block + 2);
       expect(data.winners).to.deep.equal([7, 17, 6, 0, 0]);
       let ticket = await lottery.getTicketPrize(2);
-      expect(ticket.player).to.equal(await player.getAddress());
+      expect(ticket.player).to.equal(playerAddress);
       expect(ticket.prize).to.equal((prize * 6n) / 7n + (prize * 16n) / 17n + prize);
       expect(ticket.withdrawBlockNumber).to.equal(0);
       await lottery.withdrawPrize(2);
       expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value - ticket.prize);
       ticket = await lottery.getTicketPrize(2);
-      expect(ticket.player).to.equal(await player.getAddress());
+      expect(ticket.player).to.equal(playerAddress);
       expect(ticket.prize).to.equal((prize * 6n) / 7n + (prize * 16n) / 17n + prize);
       expect(ticket.withdrawBlockNumber).to.equal(block + 3);
       await expect(lottery.withdrawPrize(2)).to.be.reverted;
+    });
+  });
+
+  describe('permit', () => {
+    it('buy with permit', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = price * 36n - ((price * 36n) / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      const stash = value - prize * 5n;
+      await buyTicketWithPermit([1, 2, 13, 14, 15, 16]);
+      await buyTicketWithPermit([1, 2, 3, 4, 15, 16, 17]);
+      await buyTicketWithPermit([1, 2, 3, 14, 15, 16, 17, 18]);
+      const block = await time.latestBlock();
+      await draw123456();
+      const data = await lottery.getRoundData(1);
+      expect(data.baseTicketPrice).to.equal(price);
+      expect(data.prizes).to.deep.equal([prize, prize, prize, prize, prize]);
+      expect(data.stash).to.equal(stash);
+      expect(data.totalCombinations).to.equal(36);
+      expect(data.drawBlockNumber).to.equal(block + 1);
+      expect(data.vrfRequestId).to.equal(1);
+      expect(data.numbers).to.deep.equal([1, 2, 3, 4, 5, 6]);
+      expect(data.closureBlockNumber).to.equal(block + 2);
+      expect(data.winners).to.deep.equal([16, 14, 3, 0, 0]);
+      let ticket = await lottery.getTicketPrize(2);
+      expect(ticket.player).to.equal(playerAddress);
+      expect(ticket.prize).to.equal((prize * 4n) / 14n + prize);
+      expect(ticket.withdrawBlockNumber).to.equal(0);
+      await lottery.withdrawPrize(2);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value - ticket.prize);
+      ticket = await lottery.getTicketPrize(2);
+      expect(ticket.player).to.equal(playerAddress);
+      expect(ticket.prize).to.equal((prize * 4n) / 14n + prize);
+      expect(ticket.withdrawBlockNumber).to.equal(block + 3);
+      await expect(lottery.withdrawPrize(2)).to.be.reverted;
+    });
+
+    it('cannot buy with permit when paused', async () => {
+      await lottery.pause();
+      await expect(buyTicketWithPermit([1, 2, 13, 14, 15, 16, 17])).to.be.reverted;
+    });
+
+    it('buy 6 with permit', async () => {
+      const price = await lottery.getBaseTicketPrice();
+      const value = price * 3n - ((price * 3n) / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      const stash = value - prize * 5n;
+      await buyTicket6WithPermit([1, 2, 13, 14, 15, 16]);
+      await buyTicket6WithPermit([1, 2, 3, 4, 15, 16]);
+      await buyTicket6WithPermit([1, 2, 3, 14, 15, 16]);
+      const block = await time.latestBlock();
+      await draw123456();
+      const data = await lottery.getRoundData(1);
+      expect(data.baseTicketPrice).to.equal(price);
+      expect(data.prizes).to.deep.equal([prize, prize, prize, prize, prize]);
+      expect(data.stash).to.equal(stash);
+      expect(data.totalCombinations).to.equal(3);
+      expect(data.drawBlockNumber).to.equal(block + 1);
+      expect(data.vrfRequestId).to.equal(1);
+      expect(data.numbers).to.deep.equal([1, 2, 3, 4, 5, 6]);
+      expect(data.closureBlockNumber).to.equal(block + 2);
+      expect(data.winners).to.deep.equal([1, 1, 1, 0, 0]);
+      let ticket = await lottery.getTicketPrize(2);
+      expect(ticket.player).to.equal(playerAddress);
+      expect(ticket.prize).to.equal(prize);
+      expect(ticket.withdrawBlockNumber).to.equal(0);
+      await lottery.withdrawPrize(2);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(value - ticket.prize);
+      ticket = await lottery.getTicketPrize(2);
+      expect(ticket.player).to.equal(playerAddress);
+      expect(ticket.prize).to.equal(prize);
+      expect(ticket.withdrawBlockNumber).to.equal(block + 3);
+      await expect(lottery.withdrawPrize(2)).to.be.reverted;
+    });
+
+    it('frontrun', async () => {
+      const numbers = [1, 2, 3, 14, 15, 16, 17, 18];
+      const price = (await lottery.getBaseTicketPrice()) * 28n;
+      const value = price - (price / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await currencyToken.connect(player).mint(price);
+      await currencyToken.connect(player).approve(lotteryAddress, price);
+      const { r, s, v, deadline } = await signPermit(price);
+      await lottery
+        .connect(player)
+        .createTicketWithPermit(NULL_REFERRAL_CODE, numbers, price, deadline, v, r, s);
+      expect(await currencyToken.balanceOf(playerAddress)).to.equal(0);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(price);
+      await draw123456();
+      let ticket = await lottery.getTicketPrize(1);
+      expect(ticket.player).to.equal(playerAddress);
+      expect(ticket.prize).to.equal(prize * 2n);
+      expect(ticket.withdrawBlockNumber).to.equal(0);
+    });
+
+    it('frontrun 6', async () => {
+      const numbers = [1, 2, 3, 14, 15, 16];
+      const price = await lottery.getBaseTicketPrice();
+      const value = price - (price / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      await currencyToken.connect(player).mint(price);
+      await currencyToken.connect(player).approve(lotteryAddress, price);
+      const { r, s, v, deadline } = await signPermit(price);
+      await lottery
+        .connect(player)
+        .createTicket6WithPermit(NULL_REFERRAL_CODE, numbers, price, deadline, v, r, s);
+      expect(await currencyToken.balanceOf(playerAddress)).to.equal(0);
+      expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(price);
+      await draw123456();
+      let ticket = await lottery.getTicketPrize(1);
+      expect(ticket.player).to.equal(playerAddress);
+      expect(ticket.prize).to.equal(prize);
+      expect(ticket.withdrawBlockNumber).to.equal(0);
     });
   });
 });

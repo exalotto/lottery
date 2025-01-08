@@ -4,6 +4,8 @@ pragma solidity ^0.8.26;
 import "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
 import "@openzeppelin/contracts/interfaces/IERC1363Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -32,6 +34,7 @@ contract Lottery is
   PausableUpgradeable,
   ReentrancyGuardUpgradeable
 {
+  using SafeERC20 for IERC20;
   using TicketIndex for mapping(uint256 => uint);
   using UserTickets for TicketData[];
 
@@ -289,7 +292,7 @@ contract Lottery is
     uint256 stash = (value * 60) / 248;
     _rounds[currentRound].prizes[4] += value - stash;
     _rounds[currentRound].stash += stash;
-    currencyToken.transferFrom(source, address(this), value);
+    currencyToken.safeTransferFrom(source, address(this), value);
   }
 
   /// @notice Accept funding via the ERC-1363 interface. This only works if the `currencyToken`
@@ -437,7 +440,7 @@ contract Lottery is
     playersByTicket.push(msg.sender);
     _rounds[currentRound].totalCombinations += combinations;
     _rounds[currentRound].combinationsByReferralCode[referralCode] += combinations;
-    currencyToken.transferFrom(msg.sender, address(this), price);
+    currencyToken.safeTransferFrom(msg.sender, address(this), price);
     emit Ticket(currentRound, msg.sender, ticketId, numbers, referralCode);
   }
 
@@ -472,8 +475,74 @@ contract Lottery is
     playersByTicket.push(msg.sender);
     _rounds[currentRound].totalCombinations++;
     _rounds[currentRound].combinationsByReferralCode[referralCode]++;
-    currencyToken.transferFrom(msg.sender, address(this), _rounds[currentRound].baseTicketPrice);
+    currencyToken.safeTransferFrom(
+      msg.sender,
+      address(this),
+      _rounds[currentRound].baseTicketPrice
+    );
     emit Ticket6(currentRound, msg.sender, ticketId, numbers, referralCode);
+  }
+
+  /// @notice Creates a ticket by approving the spending for the ticket's price with ERC-2612. This
+  ///   method is frontrunning-tolerant, meaning that it will still try to transfer the amount and
+  ///   create the ticket if the permit fails for any reason (e.g. insufficient balance for the
+  ///   permit or no support for ERC-2612).
+  /// @param referralCode A referral code for the ticket, as per `createTicket`.
+  /// @param numbers The numbers to play, as per `createTicket`.
+  /// @param value The amount of currency wei to approve. An amount greater than or equal to the
+  ///   ticket price needs to be approved, but `value` may be lower if for any reason some other
+  ///   amount had already been approved and not spended prior to this call and the total approved
+  ///   allowance for the lottery is greater than or equal to the ticket price.
+  /// @param deadline The deadline of the signature as per ERC-2612.
+  /// @param v The v parameter of the signature as per ERC-2612.
+  /// @param r The r parameter of the signature as per ERC-2612.
+  /// @param s The s parameter of the signature as per ERC-2612.
+  function createTicketWithPermit(
+    bytes32 referralCode,
+    uint8[] calldata numbers,
+    uint256 value,
+    uint256 deadline,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
+  ) public whenNotPaused {
+    try
+      IERC20Permit(address(currencyToken)).permit(
+        msg.sender,
+        address(this),
+        value,
+        deadline,
+        v,
+        r,
+        s
+      )
+    {} catch {}
+    createTicket(referralCode, numbers);
+  }
+
+  /// @notice Like `createTicketWithPermit` but uses `createTicket6` instead of `createTicket`, and
+  ///   is therefore more gas-efficient.
+  function createTicket6WithPermit(
+    bytes32 referralCode,
+    uint8[6] calldata numbers,
+    uint256 value,
+    uint256 deadline,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
+  ) public whenNotPaused {
+    try
+      IERC20Permit(address(currencyToken)).permit(
+        msg.sender,
+        address(this),
+        value,
+        deadline,
+        v,
+        r,
+        s
+      )
+    {} catch {}
+    createTicket6(referralCode, numbers);
   }
 
   /// @notice Returns the IDs of all the ticket ever bought by a player.
@@ -666,7 +735,7 @@ contract Lottery is
     uint256 ownerRevenue = getOwnerRevenue();
     _createNewRound();
     _open = true;
-    currencyToken.transfer(owner(), ownerRevenue);
+    currencyToken.safeTransfer(owner(), ownerRevenue);
     emit Draw(roundNumber, round.totalCombinations, round.numbers, round.winners, round.prizes);
   }
 
@@ -727,7 +796,7 @@ contract Lottery is
       revert PrizeAlreadyWithdrawnError(ticketId);
     }
     ticket.withdrawBlockNumber = block.number;
-    currencyToken.transfer(player, prize);
+    currencyToken.safeTransfer(player, prize);
     emit PrizeWithdrawal(ticketId, player, prize);
   }
 }

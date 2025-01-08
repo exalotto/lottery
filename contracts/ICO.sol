@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -10,6 +11,9 @@ import "./Lottery.sol";
 import "./Token.sol";
 
 contract LotteryICO is Ownable, Pausable, ReentrancyGuard {
+  using SafeERC20 for IERC20;
+  using SafeERC20 for LotteryToken;
+
   error InvalidStateError();
   error InsufficientTokensError(uint256 available, uint256 requested);
   error IncorrectValueError(uint256 got, uint256 want);
@@ -118,7 +122,7 @@ contract LotteryICO is Ownable, Pausable, ReentrancyGuard {
     }
     tokensSold += amount;
     _balances[msg.sender] += amount;
-    currencyToken.transferFrom(msg.sender, address(this), getPriceFor(amount));
+    currencyToken.safeTransferFrom(msg.sender, address(this), getPriceFor(amount));
   }
 
   /// @notice Transfers the requested EXL-wei `amount` to the sender, reverting if the token sale is
@@ -129,7 +133,7 @@ contract LotteryICO is Ownable, Pausable, ReentrancyGuard {
       revert InsufficientBalanceError(amount, balance);
     }
     _balances[msg.sender] -= amount;
-    token.transfer(msg.sender, amount);
+    token.safeTransfer(msg.sender, amount);
   }
 
   /// @notice Transfers all EXL balance (as per `balanceOf(msg.sender)`) to the sender. Reverts if
@@ -140,6 +144,6 @@ contract LotteryICO is Ownable, Pausable, ReentrancyGuard {
       revert InsufficientBalanceError(0, 0);
     }
     _balances[msg.sender] = 0;
-    token.transfer(msg.sender, balance);
+    token.safeTransfer(msg.sender, balance);
   }
 }
