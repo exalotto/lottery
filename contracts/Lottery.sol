@@ -111,6 +111,7 @@ contract Lottery is
   event PrizeWithdrawal(uint indexed ticketId, address indexed account, uint256 amount);
 
   error ZeroAddress();
+  error InvalidTicketPrice(uint256 value);
   error ReferralCodeAlreadyExistsError(bytes32 referralCode);
   error SalesAreClosedError();
   error InvalidNumberError(uint8 number);
@@ -182,6 +183,12 @@ contract Lottery is
     IVRFCoordinatorV2Plus _vrfCoordinator,
     uint256 initialTicketPrice
   ) private onlyInitializing {
+    if (address(_currencyToken) == address(0) || address(_vrfCoordinator) == address(0)) {
+      revert ZeroAddress();
+    }
+    if (initialTicketPrice == 0) {
+      revert InvalidTicketPrice(initialTicketPrice);
+    }
     currencyToken = _currencyToken;
     vrfCoordinator = _vrfCoordinator;
     _baseTicketPrice = initialTicketPrice;
