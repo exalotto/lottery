@@ -2,15 +2,15 @@
   "manifestVersion": "3.2",
   "proxies": [
     {
-      "address": "0x27a3D3890C1eE192544e4CF3F9F9823797e77F4b",
-      "txHash": "0x15d2cf69a36d5688ec014c5d723b07ded124c6696f888b771478e87b6940bf7c",
+      "address": "0xbeEfa6D02a429209d08cAC7a4247C60700bb4DB5",
+      "txHash": "0xc7ec0795bf51596e2af9a200bef9c06bc957dd48210d0ed3db28930de4cb9a24",
       "kind": "uups"
     }
   ],
   "impls": {
-    "a87c9eb7854bf31f41852e6c942c670c23e591ed65cdad2aba9e2471d3c50ccd": {
-      "address": "0x79C89e265AcaB757B0dF71EE0C6727Ebb09818bA",
-      "txHash": "0x712f03af340309f31ccc9092c078ebf9437f138d973b682ff713639dbd4bd899",
+    "34273b86ae2740243ce8d05474eb692d55a8f0df13485c1504d0df57fe501b7a": {
+      "address": "0xCFDf8B95C62082a70583903938159FE26A2908ca",
+      "txHash": "0x46999c3dd54c95f5e7f47979bf6eb8253f2d79027b43bac18548b91aaf3c6fcc",
       "layout": {
         "solcVersion": "0.8.26",
         "storage": [
@@ -18,17 +18,17 @@
             "label": "currencyToken",
             "offset": 0,
             "slot": "0",
-            "type": "t_contract(IERC20)2989",
+            "type": "t_contract(IERC20)8026",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:123"
+            "src": "contracts/Lottery.sol:130"
           },
           {
             "label": "vrfCoordinator",
             "offset": 0,
             "slot": "1",
-            "type": "t_contract(VRFCoordinatorV2Interface)95",
+            "type": "t_contract(IVRFCoordinatorV2Plus)17",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:126"
+            "src": "contracts/Lottery.sol:133"
           },
           {
             "label": "_baseTicketPrice",
@@ -36,15 +36,15 @@
             "slot": "2",
             "type": "t_uint256",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:134"
+            "src": "contracts/Lottery.sol:141"
           },
           {
             "label": "_ticketsByPlayer",
             "offset": 0,
             "slot": "3",
-            "type": "t_mapping(t_address,t_array(t_struct(TicketData)15433_storage)dyn_storage)",
+            "type": "t_mapping(t_address,t_array(t_struct(TicketData)22582_storage)dyn_storage)",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:139"
+            "src": "contracts/Lottery.sol:146"
           },
           {
             "label": "playersByTicket",
@@ -52,15 +52,15 @@
             "slot": "4",
             "type": "t_array(t_address)dyn_storage",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:143"
+            "src": "contracts/Lottery.sol:150"
           },
           {
             "label": "_rounds",
             "offset": 0,
             "slot": "5",
-            "type": "t_array(t_struct(RoundData)11354_storage)dyn_storage",
+            "type": "t_array(t_struct(RoundData)18169_storage)dyn_storage",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:148"
+            "src": "contracts/Lottery.sol:155"
           },
           {
             "label": "_open",
@@ -68,7 +68,7 @@
             "slot": "6",
             "type": "t_bool",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:153"
+            "src": "contracts/Lottery.sol:160"
           },
           {
             "label": "_nextDrawTime",
@@ -76,7 +76,7 @@
             "slot": "7",
             "type": "t_uint256",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:156"
+            "src": "contracts/Lottery.sol:163"
           },
           {
             "label": "partnersByReferralCode",
@@ -84,7 +84,7 @@
             "slot": "8",
             "type": "t_mapping(t_bytes32,t_address)",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:159"
+            "src": "contracts/Lottery.sol:166"
           },
           {
             "label": "referralCodesByPartner",
@@ -92,7 +92,7 @@
             "slot": "9",
             "type": "t_mapping(t_address,t_array(t_bytes32)dyn_storage)",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:162"
+            "src": "contracts/Lottery.sol:169"
           },
           {
             "label": "_lastWithdrawRoundByReferralCode",
@@ -100,7 +100,7 @@
             "slot": "10",
             "type": "t_mapping(t_bytes32,t_uint256)",
             "contract": "Lottery",
-            "src": "contracts/Lottery.sol:167"
+            "src": "contracts/Lottery.sol:174"
           }
         ],
         "types": {
@@ -112,7 +112,7 @@
             "label": "bool",
             "numberOfBytes": "1"
           },
-          "t_struct(InitializableStorage)160_storage": {
+          "t_struct(InitializableStorage)215_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -130,7 +130,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(OwnableStorage)100_storage": {
+          "t_struct(OwnableStorage)155_storage": {
             "label": "struct OwnableUpgradeable.OwnableStorage",
             "members": [
               {
@@ -142,7 +142,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)306_storage": {
+          "t_struct(PausableStorage)361_storage": {
             "label": "struct PausableUpgradeable.PausableStorage",
             "members": [
               {
@@ -154,7 +154,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)370_storage": {
+          "t_struct(ReentrancyGuardStorage)425_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -182,11 +182,11 @@
             "label": "bytes32[]",
             "numberOfBytes": "32"
           },
-          "t_array(t_struct(RoundData)11354_storage)dyn_storage": {
+          "t_array(t_struct(RoundData)18169_storage)dyn_storage": {
             "label": "struct Lottery.RoundData[]",
             "numberOfBytes": "32"
           },
-          "t_array(t_struct(TicketData)15433_storage)dyn_storage": {
+          "t_array(t_struct(TicketData)22582_storage)dyn_storage": {
             "label": "struct TicketData[]",
             "numberOfBytes": "32"
           },
@@ -202,19 +202,19 @@
             "label": "bytes32",
             "numberOfBytes": "32"
           },
-          "t_contract(IERC20)2989": {
+          "t_contract(IERC20)8026": {
             "label": "contract IERC20",
             "numberOfBytes": "20"
           },
-          "t_contract(VRFCoordinatorV2Interface)95": {
-            "label": "contract VRFCoordinatorV2Interface",
+          "t_contract(IVRFCoordinatorV2Plus)17": {
+            "label": "contract IVRFCoordinatorV2Plus",
             "numberOfBytes": "20"
           },
           "t_mapping(t_address,t_array(t_bytes32)dyn_storage)": {
             "label": "mapping(address => bytes32[])",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_address,t_array(t_struct(TicketData)15433_storage)dyn_storage)": {
+          "t_mapping(t_address,t_array(t_struct(TicketData)22582_storage)dyn_storage)": {
             "label": "mapping(address => struct TicketData[])",
             "numberOfBytes": "32"
           },
@@ -230,7 +230,7 @@
             "label": "mapping(uint256 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_struct(RoundData)11354_storage": {
+          "t_struct(RoundData)18169_storage": {
             "label": "struct Lottery.RoundData",
             "members": [
               {
@@ -302,7 +302,7 @@
             ],
             "numberOfBytes": "608"
           },
-          "t_struct(TicketData)15433_storage": {
+          "t_struct(TicketData)22582_storage": {
             "label": "struct TicketData",
             "members": [
               {
