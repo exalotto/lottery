@@ -75,7 +75,7 @@ contract LotteryController is TimelockController, Pausable, ReentrancyGuard {
   }
 
   /// @notice Triggers a drawing. Reverts if `canDraw() == false`.
-  function draw(uint64 vrfSubscriptionId, bytes32 vrfKeyHash) public whenNotPaused nonReentrant {
+  function draw(uint256 vrfSubscriptionId, bytes32 vrfKeyHash) public whenNotPaused nonReentrant {
     lottery.draw(vrfSubscriptionId, vrfKeyHash);
   }
 

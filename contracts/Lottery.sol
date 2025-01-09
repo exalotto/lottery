@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/interfaces/IVRFMigratableConsumerV2Plus.sol";
+import "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import "@openzeppelin/contracts/interfaces/IERC1363Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
@@ -30,7 +32,8 @@ contract Lottery is
   UUPSUpgradeable,
   OwnableUpgradeable,
   PausableUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  IVRFMigratableConsumerV2Plus
 {
   using SafeERC20 for IERC20;
   using TicketIndex for mapping(uint256 => uint);
@@ -107,6 +110,7 @@ contract Lottery is
 
   event PrizeWithdrawal(uint indexed ticketId, address indexed account, uint256 amount);
 
+  error ZeroAddress();
   error ReferralCodeAlreadyExistsError(bytes32 referralCode);
   error SalesAreClosedError();
   error InvalidNumberError(uint8 number);
@@ -115,7 +119,8 @@ contract Lottery is
   error InvalidReferralCodeError(bytes32 referralCode);
   error InvalidRoundNumberError(uint round);
   error InvalidStateError();
-  error OnlyCoordinatorCanFulfill(address got, address want);
+  error OnlyCoordinatorCanFulfill(address have, address want);
+  error OnlyOwnerOrCoordinator(address have, address owner, address coordinator);
   error VRFRequestError(uint256 requestId, uint256 expectedRequestId);
   error NoPrizeError(uint ticketId);
   error PrizeAlreadyWithdrawnError(uint ticketId);
@@ -124,7 +129,7 @@ contract Lottery is
   IERC20 public currencyToken;
 
   /// @notice ChainLink VRF coordinator.
-  VRFCoordinatorV2Interface public vrfCoordinator;
+  IVRFCoordinatorV2Plus public vrfCoordinator;
 
   /// @dev Price of a 6-number ticket in wei. This is not actually taken into account when a user
   ///   buys a ticket. The price of a ticket is calculated using the `baseTicketPrice` field of the
@@ -174,7 +179,7 @@ contract Lottery is
 
   function __Lottery_init_unchained(
     IERC20 _currencyToken,
-    VRFCoordinatorV2Interface _vrfCoordinator,
+    IVRFCoordinatorV2Plus _vrfCoordinator,
     uint256 initialTicketPrice
   ) private onlyInitializing {
     currencyToken = _currencyToken;
@@ -192,7 +197,7 @@ contract Lottery is
 
   function initialize(
     IERC20 _currencyToken,
-    VRFCoordinatorV2Interface _vrfCoordinator,
+    IVRFCoordinatorV2Plus _vrfCoordinator,
     uint256 initialTicketPrice
   ) public initializer {
     __UUPSUpgradeable_init();
@@ -203,6 +208,21 @@ contract Lottery is
   }
 
   function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+  modifier onlyOwnerOrCoordinator() {
+    if (msg.sender != owner() && msg.sender != address(vrfCoordinator)) {
+      revert OnlyOwnerOrCoordinator(msg.sender, owner(), address(vrfCoordinator));
+    }
+    _;
+  }
+
+  function setCoordinator(address _vrfCoordinator) external override onlyOwnerOrCoordinator {
+    if (_vrfCoordinator == address(0)) {
+      revert ZeroAddress();
+    }
+    vrfCoordinator = IVRFCoordinatorV2Plus(_vrfCoordinator);
+    emit CoordinatorSet(_vrfCoordinator);
+  }
 
   /// @notice For emergency response.
   function pause() public onlyOwner {
@@ -715,7 +735,7 @@ contract Lottery is
   }
 
   /// @notice Triggers the drawing process. Fails if called outside of a drawing window.
-  function draw(uint64 vrfSubscriptionId, bytes32 vrfKeyHash) public onlyOwner {
+  function draw(uint256 vrfSubscriptionId, bytes32 vrfKeyHash) public onlyOwner {
     if (!canDraw()) {
       revert InvalidStateError();
     }
@@ -724,11 +744,14 @@ contract Lottery is
     RoundData storage round = _getCurrentRoundData();
     round.drawBlockNumber = block.number;
     round.vrfRequestId = vrfCoordinator.requestRandomWords(
-      vrfKeyHash,
-      vrfSubscriptionId,
-      VRF_REQUEST_CONFIRMATIONS,
-      VRF_CALLBACK_GAS_LIMIT,
-      /*numWords=*/ 1
+      VRFV2PlusClient.RandomWordsRequest({
+        keyHash: vrfKeyHash,
+        subId: vrfSubscriptionId,
+        requestConfirmations: VRF_REQUEST_CONFIRMATIONS,
+        callbackGasLimit: VRF_CALLBACK_GAS_LIMIT,
+        numWords: 1,
+        extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+      })
     );
     emit VRFRequest(getCurrentRound(), vrfSubscriptionId, round.vrfRequestId);
   }
@@ -767,7 +790,7 @@ contract Lottery is
   /// @notice ChainLink VRF callback.
   function rawFulfillRandomWords(
     uint256 requestId,
-    uint256[] memory randomWords
+    uint256[] calldata randomWords
   ) external whenNotPaused {
     if (msg.sender != address(vrfCoordinator)) {
       revert OnlyCoordinatorCanFulfill(msg.sender, address(vrfCoordinator));

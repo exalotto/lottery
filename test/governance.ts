@@ -26,7 +26,7 @@ describe('Governance', () => {
 
   let currencyToken: FakeToken;
   let vrfCoordinator: MockVRFCoordinator;
-  const subscriptionId = 1;
+  let subscriptionId: bigint;
   let requestId = 1;
 
   let snapshot: SnapshotRestorer;
@@ -41,6 +41,7 @@ describe('Governance', () => {
     currencyToken = await deployer.deployFakeTokenForTesting();
     vrfCoordinator = await deployer.deployMockVRFCoordinator();
     await vrfCoordinator.createSubscription();
+    [subscriptionId] = await vrfCoordinator.getActiveSubscriptionIds(0, 1);
     const [currencyTokenAddress, vrfCoordinatorAddress] = await Promise.all([
       currencyToken.getAddress(),
       vrfCoordinator.getAddress(),
