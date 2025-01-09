@@ -12,6 +12,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
+import "./DaiPermit.sol";
 import "./Drawing.sol";
 import "./TicketIndex.sol";
 import "./UserTickets.sol";
@@ -36,7 +37,7 @@ contract Lottery is
   using UserTickets for TicketData[];
 
   struct RoundData {
-    /// @dev Price of a 6-number ticket for the round, in wei.
+    /// @dev Price of a 6-number ticket for the round, in wei of the currency token.
     uint256 baseTicketPrice;
     /// @dev Indexes tickets by played numbers. This data structure is used with the `TicketIndex`
     ///   library. See the note on that library for more information on how it works.
@@ -536,6 +537,60 @@ contract Lottery is
         address(this),
         value,
         deadline,
+        v,
+        r,
+        s
+      )
+    {} catch {}
+    createTicket6(referralCode, numbers);
+  }
+
+  /// @notice This is functionally the same as `createTicketWithPermit` but uses `DaiPermit` instead
+  ///   of `IERC20Permit`.
+  function createTicketWithDaiPermit(
+    bytes32 referralCode,
+    uint8[] calldata numbers,
+    uint256 nonce,
+    uint256 expiry,
+    bool allowed,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
+  ) public whenNotPaused {
+    try
+      DaiPermit(address(currencyToken)).permit(
+        msg.sender,
+        address(this),
+        nonce,
+        expiry,
+        allowed,
+        v,
+        r,
+        s
+      )
+    {} catch {}
+    createTicket(referralCode, numbers);
+  }
+
+  /// @notice This is functionally the same as `createTicket6WithPermit` but uses `DaiPermit`
+  ///   instead of `IERC20Permit`.
+  function createTicket6WithDaiPermit(
+    bytes32 referralCode,
+    uint8[6] calldata numbers,
+    uint256 nonce,
+    uint256 expiry,
+    bool allowed,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
+  ) public whenNotPaused {
+    try
+      DaiPermit(address(currencyToken)).permit(
+        msg.sender,
+        address(this),
+        nonce,
+        expiry,
+        allowed,
         v,
         r,
         s
