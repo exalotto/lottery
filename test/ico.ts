@@ -116,6 +116,8 @@ describe('ICO', () => {
       expect(await token.balanceOf(icoAddress)).to.equal(totalSupply);
       expect(await ico.tokensForSale()).to.equal(12345);
       expect(await ico.tokensSold()).to.equal(123);
+      expect(await ico.price()).to.equal(price1);
+      expect(await ico.isOpen()).to.equal(true);
       expect(await ico.balanceOf(owner)).to.equal(0);
       expect(await ico.balanceOf(partner1)).to.equal(123);
       expect(await ico.balanceOf(partner2)).to.equal(0);
@@ -129,6 +131,8 @@ describe('ICO', () => {
       expect(await token.balanceOf(icoAddress)).to.equal(totalSupply);
       expect(await ico.tokensForSale()).to.equal(12345);
       expect(await ico.tokensSold()).to.equal(321);
+      expect(await ico.price()).to.equal(price1);
+      expect(await ico.isOpen()).to.equal(true);
       expect(await ico.balanceOf(owner)).to.equal(0);
       expect(await ico.balanceOf(partner1)).to.equal(0);
       expect(await ico.balanceOf(partner2)).to.equal(321);
@@ -143,6 +147,8 @@ describe('ICO', () => {
       expect(await token.balanceOf(icoAddress)).to.equal(totalSupply);
       expect(await ico.tokensForSale()).to.equal(12345);
       expect(await ico.tokensSold()).to.equal(123 + 321);
+      expect(await ico.price()).to.equal(price1);
+      expect(await ico.isOpen()).to.equal(true);
       expect(await ico.balanceOf(owner)).to.equal(0);
       expect(await ico.balanceOf(partner1)).to.equal(321);
       expect(await ico.balanceOf(partner2)).to.equal(123);
@@ -157,6 +163,8 @@ describe('ICO', () => {
       expect(await token.balanceOf(icoAddress)).to.equal(totalSupply);
       expect(await ico.tokensForSale()).to.equal(12345);
       expect(await ico.tokensSold()).to.equal(123 + 321);
+      expect(await ico.price()).to.equal(price1);
+      expect(await ico.isOpen()).to.equal(true);
       expect(await ico.balanceOf(owner)).to.equal(0);
       expect(await ico.balanceOf(partner1)).to.equal(123 + 321);
       expect(await ico.balanceOf(partner2)).to.equal(0);
@@ -389,6 +397,8 @@ describe('ICO', () => {
       expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 200n);
       expect(await ico.tokensForSale()).to.equal(54321);
       expect(await ico.tokensSold()).to.equal(123);
+      expect(await ico.price()).to.equal(price2);
+      expect(await ico.isOpen()).to.equal(true);
       expect(await ico.balanceOf(owner)).to.equal(0);
       expect(await ico.balanceOf(partner1)).to.equal(146);
       expect(await ico.balanceOf(partner2)).to.equal(221);
@@ -403,6 +413,8 @@ describe('ICO', () => {
       expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 200n);
       expect(await ico.tokensForSale()).to.equal(54321);
       expect(await ico.tokensSold()).to.equal(321);
+      expect(await ico.price()).to.equal(price2);
+      expect(await ico.isOpen()).to.equal(true);
       expect(await ico.balanceOf(owner)).to.equal(0);
       expect(await ico.balanceOf(partner1)).to.equal(23);
       expect(await ico.balanceOf(partner2)).to.equal(542);
@@ -418,6 +430,8 @@ describe('ICO', () => {
       expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 200n);
       expect(await ico.tokensForSale()).to.equal(54321);
       expect(await ico.tokensSold()).to.equal(123 + 321);
+      expect(await ico.price()).to.equal(price2);
+      expect(await ico.isOpen()).to.equal(true);
       expect(await ico.balanceOf(owner)).to.equal(0);
       expect(await ico.balanceOf(partner1)).to.equal(344);
       expect(await ico.balanceOf(partner2)).to.equal(344);
@@ -433,6 +447,8 @@ describe('ICO', () => {
       expect(await token.balanceOf(icoAddress)).to.equal(totalSupply - 200n);
       expect(await ico.tokensForSale()).to.equal(54321);
       expect(await ico.tokensSold()).to.equal(123 + 321);
+      expect(await ico.price()).to.equal(price2);
+      expect(await ico.isOpen()).to.equal(true);
       expect(await ico.balanceOf(owner)).to.equal(0);
       expect(await ico.balanceOf(partner1)).to.equal(467);
       expect(await ico.balanceOf(partner2)).to.equal(221);
