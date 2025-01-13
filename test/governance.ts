@@ -73,7 +73,11 @@ describe('Governance', () => {
   };
 
   const draw = async () => {
-    await controller.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!);
+    await controller.draw(
+      subscriptionId,
+      process.env.CHAINLINK_VRF_KEY_HASH!,
+      /*nativePayment=*/ false,
+    );
     await vrfCoordinator.fulfillRandomWordsWithOverride(
       requestId++,
       lotteryAddress,

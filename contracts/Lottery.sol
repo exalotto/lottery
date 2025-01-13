@@ -742,7 +742,11 @@ contract Lottery is
   }
 
   /// @notice Triggers the drawing process. Fails if called outside of a drawing window.
-  function draw(uint256 vrfSubscriptionId, bytes32 vrfKeyHash) public onlyOwner {
+  function draw(
+    uint256 vrfSubscriptionId,
+    bytes32 vrfKeyHash,
+    bool nativePayment
+  ) public onlyOwner {
     if (!canDraw()) {
       revert InvalidStateError();
     }
@@ -757,7 +761,9 @@ contract Lottery is
         requestConfirmations: VRF_REQUEST_CONFIRMATIONS,
         callbackGasLimit: VRF_CALLBACK_GAS_LIMIT,
         numWords: 6,
-        extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+        extraArgs: VRFV2PlusClient._argsToBytes(
+          VRFV2PlusClient.ExtraArgsV1({nativePayment: nativePayment})
+        )
       })
     );
     emit VRFRequest(getCurrentRound(), vrfSubscriptionId, round.vrfRequestId);

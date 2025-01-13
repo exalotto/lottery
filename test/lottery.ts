@@ -134,7 +134,11 @@ describe('Lottery', () => {
   };
 
   const draw123456 = async () => {
-    await lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!);
+    await lottery.draw(
+      subscriptionId,
+      process.env.CHAINLINK_VRF_KEY_HASH!,
+      /*nativePayment=*/ false,
+    );
     await vrfCoordinator.fulfillRandomWordsWithOverride(
       requestId++,
       lotteryAddress,
@@ -456,8 +460,9 @@ describe('Lottery', () => {
     it('cannot draw', async () => {
       await advanceTime(60 * 60 * 24);
       expect(await lottery.canDraw()).to.equal(false);
-      await expect(lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!)).to.be
-        .reverted;
+      await expect(
+        lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!, /*nativePayment=*/ false),
+      ).to.be.reverted;
     });
 
     it('drawing window width', async () => {
@@ -471,30 +476,34 @@ describe('Lottery', () => {
       expect(await lottery.canDraw()).to.equal(true);
       await advanceTime(1);
       expect(await lottery.canDraw()).to.equal(false);
-      await expect(lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!)).to.be
-        .reverted;
+      await expect(
+        lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!, /*nativePayment=*/ false),
+      ).to.be.reverted;
     });
 
     it('next drawing window', async () => {
       await advanceTime(ONE_WEEK - ONE_HOUR);
       expect(await lottery.canDraw()).to.equal(false);
-      await expect(lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!)).to.be
-        .reverted;
+      await expect(
+        lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!, /*nativePayment=*/ false),
+      ).to.be.reverted;
       await advanceTimeToNextDrawing();
       expect(await lottery.canDraw()).to.equal(true);
       await advanceTime(THREE_HOURS);
       expect(await lottery.canDraw()).to.equal(true);
       await advanceTime(THREE_HOURS);
       expect(await lottery.canDraw()).to.equal(false);
-      await expect(lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!)).to.be
-        .reverted;
+      await expect(
+        lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!, /*nativePayment=*/ false),
+      ).to.be.reverted;
     });
 
     it('only one draw per window', async () => {
       await draw123456();
       await advanceTime(ONE_HOUR);
-      await expect(lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!)).to.be
-        .reverted;
+      await expect(
+        lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!, /*nativePayment=*/ false),
+      ).to.be.reverted;
     });
 
     it('skip a draw', async () => {
