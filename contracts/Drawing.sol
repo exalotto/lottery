@@ -36,15 +36,14 @@ library Drawing {
   ///   Fisher-Yates shuffle algorithm.
   /// @return numbers 6 different random numbers between 1 and 90 inclusive.
   function getRandomNumbersWithoutRepetitions(
-    uint256 randomness
+    uint256[] calldata randomness
   ) public pure returns (uint8[6] memory numbers) {
     uint8[90] memory source;
     for (uint8 i = 1; i <= 90; i++) {
       source[i - 1] = i;
     }
     for (uint i = 0; i < 6; i++) {
-      uint j = i + (randomness % (90 - i));
-      randomness /= 90;
+      uint j = i + (randomness[i] % (90 - i));
       numbers[i] = source[j];
       source[j] = source[i];
     }

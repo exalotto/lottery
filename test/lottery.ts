@@ -135,9 +135,14 @@ describe('Lottery', () => {
 
   const draw123456 = async () => {
     await lottery.draw(subscriptionId, process.env.CHAINLINK_VRF_KEY_HASH!);
-    await vrfCoordinator.fulfillRandomWordsWithOverride(requestId++, lotteryAddress, [0], {
-      gasLimit: process.env.EXALOTTO_CALLBACK_GAS_LIMIT,
-    });
+    await vrfCoordinator.fulfillRandomWordsWithOverride(
+      requestId++,
+      lotteryAddress,
+      [0, 0, 0, 0, 0, 0],
+      {
+        gasLimit: process.env.EXALOTTO_CALLBACK_GAS_LIMIT,
+      },
+    );
   };
 
   it('initial state', async () => {

@@ -756,7 +756,7 @@ contract Lottery is
         subId: vrfSubscriptionId,
         requestConfirmations: VRF_REQUEST_CONFIRMATIONS,
         callbackGasLimit: VRF_CALLBACK_GAS_LIMIT,
-        numWords: 1,
+        numWords: 6,
         extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
       })
     );
@@ -811,7 +811,7 @@ contract Lottery is
       revert VRFRequestError(requestId, round.vrfRequestId);
     }
     round.closureBlockNumber = block.number;
-    uint8[6] memory numbers = Drawing.getRandomNumbersWithoutRepetitions(randomWords[0]);
+    uint8[6] memory numbers = Drawing.getRandomNumbersWithoutRepetitions(randomWords);
     round.prizes = getPrizes();
     round.stash = getStash();
     round.numbers = numbers;
