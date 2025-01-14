@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./Lottery.sol";
 import "./Token.sol";
 
-contract LotteryICO is Ownable, Pausable, ReentrancyGuard {
+contract LotteryTokenSale is Ownable, Pausable, ReentrancyGuard {
   using SafeERC20 for IERC20;
   using SafeERC20 for LotteryToken;
 

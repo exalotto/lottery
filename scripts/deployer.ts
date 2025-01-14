@@ -6,8 +6,8 @@ import type {
   Lottery,
   LotteryController,
   LotteryGovernor,
-  LotteryICO,
   LotteryToken,
+  LotteryTokenSale,
   MockVRFCoordinator,
   TicketIndex,
   UserTickets,
@@ -198,28 +198,25 @@ export class Deployer {
     return { token, lottery, controller, governor };
   }
 
-  public async deployICO(
+  public async deployTokenSale(
     currencyTokenAddress: string,
     token: LotteryToken,
     lottery: Lottery,
-  ): Promise<LotteryICO> {
+  ): Promise<LotteryTokenSale> {
     const [tokenAddress, lotteryAddress] = await Promise.all([
       token.getAddress(),
       lottery.getAddress(),
     ]);
-    const ico = await deploy<LotteryICO>('LotteryICO', [
+    const tokenSale = await deploy<LotteryTokenSale>('LotteryTokenSale', [
       currencyTokenAddress,
       tokenAddress,
       lotteryAddress,
     ]);
-    const icoAddress = await ico.getAddress();
-    let tx = await send(token, 'transfer', icoAddress, await token.totalSupply());
-    console.log(`Total EXL supply transferred to ${icoAddress} -- txid ${tx.hash}`);
     if (this._deployer !== this._owner) {
-      tx = await send(ico, 'transferOwnership', this._owner);
-      console.log(`ICO ownership transferred to ${this._owner} -- txid ${tx.hash}`);
+      const tx = await send(tokenSale, 'transferOwnership', this._owner);
+      console.log(`TokenSale ownership transferred to ${this._owner} -- txid ${tx.hash}`);
     }
-    return ico;
+    return tokenSale;
   }
 
   public async deployAll(
@@ -230,13 +227,13 @@ export class Deployer {
     lottery: Lottery;
     controller: LotteryController;
     governor: LotteryGovernor;
-    ico: LotteryICO;
+    tokenSale: LotteryTokenSale;
   }> {
     const token = await this._deployToken();
     const { lottery } = await this.deployLottery(currencyTokenAddress, vrfCoordinatorAddress);
     const controller = await this.deployController(token, lottery);
     const governor = await this.deployGovernor(token, controller);
-    const ico = await this.deployICO(currencyTokenAddress, token, lottery);
-    return { token, lottery, controller, governor, ico };
+    const tokenSale = await this.deployTokenSale(currencyTokenAddress, token, lottery);
+    return { token, lottery, controller, governor, tokenSale };
   }
 }

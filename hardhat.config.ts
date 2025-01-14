@@ -48,6 +48,9 @@ const config: HardhatUserConfig = {
   mocha: {
     timeout: 0,
   },
+  sourcify: {
+    enabled: false,
+  },
 };
 
 export default config;

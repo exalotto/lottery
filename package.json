@@ -1,6 +1,6 @@
 {
   "name": "exalotto",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "prettier": "npx prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol' 'scripts/**/*' 'test/**/*'",
