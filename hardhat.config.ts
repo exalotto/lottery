@@ -25,6 +25,9 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
+    hardhat: {
+      chainId: 31337,
+    },
     mainnet: {
       url: 'https://eth.public-rpc.com',
       accounts: process.env.EXALOTTO_DEPLOYER ? [process.env.EXALOTTO_DEPLOYER] : [],
