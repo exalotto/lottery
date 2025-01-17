@@ -15,8 +15,8 @@ import type {
 
 import { deploy, deployWithProxy, getDefaultSigner, send } from './utils';
 
-// We use Dai and this is in wei, so it's $1.50.
-const INITIAL_TICKET_PRICE = 1500000000000000000n;
+// This is in USD cents, so it's $1.50.
+const INITIAL_TICKET_PRICE = 150;
 
 export class Deployer {
   private _signers: string[] = [];
@@ -68,6 +68,12 @@ export class Deployer {
     return { drawingLibrary, indexLibrary, ticketLibrary };
   }
 
+  private async _makeInitialTicketPrice(currencyTokenAddress: string): Promise<bigint> {
+    const token = await ethers.getContractAt('ERC20', currencyTokenAddress);
+    const decimals = await token.decimals();
+    return (BigInt(INITIAL_TICKET_PRICE) * 10n ** decimals) / 100n;
+  }
+
   public async deployLotteryImpl({
     drawingLibrary,
     indexLibrary,
@@ -106,7 +112,7 @@ export class Deployer {
     ]);
     const lottery = await deployWithProxy<Lottery>(
       'Lottery',
-      [currencyToken, vrfCoordinatorAddress, INITIAL_TICKET_PRICE],
+      [currencyToken, vrfCoordinatorAddress, await this._makeInitialTicketPrice(currencyToken)],
       {
         Drawing: drawingLibraryAddress,
         TicketIndex: indexLibraryAddress,
