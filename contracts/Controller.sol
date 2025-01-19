@@ -25,8 +25,12 @@ contract LotteryController is TimelockController, Pausable, ReentrancyGuard {
   /// @notice Address of the lottery smartcontract.
   Lottery public immutable lottery;
 
-  /// @dev Cumulative sum of all withdrawn amounts, by all partner accounts.
-  uint256 private _totalWithdrawn = 0;
+  /// @notice Cumulative sum of all withdrawn amounts, by all partner accounts.
+  uint256 public totalWithdrawn = 0;
+
+  /// @dev If set it's the end of a round and the controller is waiting for someone to call
+  ///   `closeRound`.
+  bool public waitingForClosure = false;
 
   /// @dev Revenue checkpoints.
   Revenue[] private _revenue;
@@ -80,13 +84,14 @@ contract LotteryController is TimelockController, Pausable, ReentrancyGuard {
     bytes32 vrfKeyHash,
     bool nativePayment
   ) public whenNotPaused nonReentrant {
+    waitingForClosure = true;
     lottery.draw(vrfSubscriptionId, vrfKeyHash, nativePayment);
   }
 
-  /// @notice Closes the round, making its revenue available for withdrawal.
+  /// @notice Closes the round, checkpointing the revenue and making it available for withdrawal.
   function closeRound() public whenNotPaused {
-    require(lottery.isOpen() && !lottery.canDraw(), "invalid state");
-    uint256 totalValue = currencyToken().balanceOf(address(this)) + _totalWithdrawn;
+    require(lottery.isOpen() && !lottery.canDraw() && waitingForClosure, "invalid state");
+    uint256 totalValue = currencyToken().balanceOf(address(this)) + totalWithdrawn;
     _revenue.push(
       Revenue({
         blockNumber: block.number,
@@ -94,12 +99,14 @@ contract LotteryController is TimelockController, Pausable, ReentrancyGuard {
         totalValue: totalValue
       })
     );
+    waitingForClosure = false;
   }
 
   /// @notice Cancels a failed drawing, i.e. one for which the ChainLink VRF never responded. Can
   ///   only be invoked after the end of a drawing window. See the corresponding method in the
   ///   Lottery contract for more information.
   function cancelFailedDrawing() public whenNotPaused nonReentrant {
+    waitingForClosure = false;
     lottery.cancelFailedDrawing();
   }
 
@@ -167,7 +174,7 @@ contract LotteryController is TimelockController, Pausable, ReentrancyGuard {
     require(_revenue.length > 0, "nothing to withdraw");
     uint256 amount = getUnclaimedRevenue(account);
     require(amount > 0, "no revenue is available for withdrawal");
-    _totalWithdrawn += amount;
+    totalWithdrawn += amount;
     lastWithdrawalBlock[account] = _revenue[_revenue.length - 1].blockNumber;
     currencyToken().safeTransfer(account, amount);
   }

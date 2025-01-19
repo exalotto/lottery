@@ -17,6 +17,7 @@ import { advanceTime, advanceTimeToNextDrawing } from './utils';
 
 const NULL_REFERRAL_CODE = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
+const ONE_DAY = 60 * 60 * 24;
 const ONE_WEEK = 60 * 60 * 24 * 7;
 
 describe('Governance', () => {
@@ -24,8 +25,11 @@ describe('Governance', () => {
 
   let signer: string;
 
+  let governanceTokenAddress: string;
   let currencyToken: FakeToken;
+  let currencyTokenAddress: string;
   let vrfCoordinator: MockVRFCoordinator;
+  let vrfCoordinatorAddress: string;
   let subscriptionId: bigint;
   let requestId = 1;
 
@@ -42,7 +46,7 @@ describe('Governance', () => {
     vrfCoordinator = await deployer.deployMockVRFCoordinator();
     await vrfCoordinator.createSubscription();
     [subscriptionId] = await vrfCoordinator.getActiveSubscriptionIds(0, 1);
-    const [currencyTokenAddress, vrfCoordinatorAddress] = await Promise.all([
+    [currencyTokenAddress, vrfCoordinatorAddress] = await Promise.all([
       currencyToken.getAddress(),
       vrfCoordinator.getAddress(),
     ]);
@@ -50,6 +54,7 @@ describe('Governance', () => {
       currencyTokenAddress,
       vrfCoordinatorAddress,
     ));
+    governanceTokenAddress = await token.getAddress();
     lotteryAddress = await lottery.getAddress();
     await vrfCoordinator.addConsumer(subscriptionId, lotteryAddress);
     await token.delegate(signer);
@@ -91,6 +96,13 @@ describe('Governance', () => {
     await mine();
   };
 
+  it('initial state', async () => {
+    expect(await controller.token()).to.equal(governanceTokenAddress);
+    expect(await controller.lottery()).to.equal(lotteryAddress);
+    expect(await controller.totalWithdrawn()).to.equal(0);
+    expect(await controller.waitingForClosure()).to.equal(false);
+  });
+
   it('pause', async () => {
     expect(await lottery.paused()).to.equal(false);
     expect(await controller.paused()).to.equal(false);
@@ -109,10 +121,75 @@ describe('Governance', () => {
   it('revenue', async () => {
     await buyTicket([4, 5, 6, 7, 8, 9]);
     await draw();
+    expect(await controller.waitingForClosure()).to.equal(false);
     const balance = await currencyToken.balanceOf(await controller.getAddress());
     expect(balance).to.not.equal(0);
     const unclaimed = await controller.getUnclaimedRevenue(signer);
     expect(balance).to.equal(unclaimed);
+  });
+
+  it('closure flag', async () => {
+    await controller.draw(
+      subscriptionId,
+      process.env.CHAINLINK_VRF_KEY_HASH!,
+      /*nativePayment=*/ false,
+    );
+    expect(await controller.waitingForClosure()).to.equal(true);
+    await vrfCoordinator.fulfillRandomWordsWithOverride(
+      requestId++,
+      lotteryAddress,
+      [0, 0, 0, 0, 0, 0],
+      {
+        gasLimit: process.env.EXALOTTO_CALLBACK_GAS_LIMIT,
+      },
+    );
+    expect(await controller.waitingForClosure()).to.equal(true);
+    await mine();
+    await controller.closeRound();
+    expect(await controller.waitingForClosure()).to.equal(false);
+    await mine();
+  });
+
+  it('prevent early closure', async () => {
+    await controller.draw(
+      subscriptionId,
+      process.env.CHAINLINK_VRF_KEY_HASH!,
+      /*nativePayment=*/ false,
+    );
+    expect(await controller.waitingForClosure()).to.equal(true);
+    await expect(controller.closeRound()).to.be.reverted;
+  });
+
+  it('prevent double closure', async () => {
+    await buyTicket([7, 8, 9, 1, 2, 3]);
+    await draw();
+    await expect(controller.closeRound()).to.be.reverted;
+    expect(await controller.waitingForClosure()).to.equal(false);
+  });
+
+  it('cancel failed drawing', async () => {
+    await controller.draw(
+      subscriptionId,
+      process.env.CHAINLINK_VRF_KEY_HASH!,
+      /*nativePayment=*/ false,
+    );
+    expect(await controller.waitingForClosure()).to.equal(true);
+    await mine();
+    await advanceTime(ONE_DAY);
+    await controller.cancelFailedDrawing();
+    expect(await controller.waitingForClosure()).to.equal(false);
+    await expect(controller.closeRound()).to.be.reverted;
+  });
+
+  it('cannot cancel drawing inside drawing window', async () => {
+    await controller.draw(
+      subscriptionId,
+      process.env.CHAINLINK_VRF_KEY_HASH!,
+      /*nativePayment=*/ false,
+    );
+    expect(await controller.waitingForClosure()).to.equal(true);
+    await mine();
+    await expect(controller.cancelFailedDrawing()).to.be.reverted;
   });
 
   it('revenue growth', async () => {
