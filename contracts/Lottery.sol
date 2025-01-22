@@ -512,14 +512,11 @@ contract Lottery is
 
   /// @notice Creates a ticket by approving the spending for the ticket's price with ERC-2612. This
   ///   method is frontrunning-tolerant, meaning that it will still try to transfer the amount and
-  ///   create the ticket if the permit fails for any reason (e.g. insufficient balance for the
-  ///   permit or no support for ERC-2612).
+  ///   create the ticket if the permit fails for any reason.
   /// @param referralCode A referral code for the ticket, as per `createTicket`.
   /// @param numbers The numbers to play, as per `createTicket`.
   /// @param value The amount of currency wei to approve. An amount greater than or equal to the
-  ///   ticket price needs to be approved, but `value` may be lower if for any reason some other
-  ///   amount had already been approved and not spended prior to this call and the total approved
-  ///   allowance for the lottery is greater than or equal to the ticket price.
+  ///   ticket price needs to be approved (you can query the price with `getTicketPrice`).
   /// @param deadline The deadline of the signature as per ERC-2612.
   /// @param v The v parameter of the signature as per ERC-2612.
   /// @param r The r parameter of the signature as per ERC-2612.
@@ -579,7 +576,6 @@ contract Lottery is
     uint8[] calldata numbers,
     uint256 nonce,
     uint256 expiry,
-    bool allowed,
     uint8 v,
     bytes32 r,
     bytes32 s
@@ -590,7 +586,7 @@ contract Lottery is
         address(this),
         nonce,
         expiry,
-        allowed,
+        /*allowed=*/ true,
         v,
         r,
         s
@@ -606,7 +602,6 @@ contract Lottery is
     uint8[6] calldata numbers,
     uint256 nonce,
     uint256 expiry,
-    bool allowed,
     uint8 v,
     bytes32 r,
     bytes32 s
@@ -617,7 +612,7 @@ contract Lottery is
         address(this),
         nonce,
         expiry,
-        allowed,
+        /*allowed=*/ true,
         v,
         r,
         s
@@ -663,7 +658,7 @@ contract Lottery is
 
   /// @notice Returns information about a round. Reverts if `roundNumber` is 0 or refers to the
   ///   current round or higher. The information about the current round is incomplete and cannot be
-  ///   obtained by this method, but other methods can be used to query the available parts.
+  ///   obtained by this method, but you can use `getCurrentRoundData` instead.
   /// @return baseTicketPrice The price in wei of a 6-number ticket for this round.
   /// @return prizes The prizes for each of the 5 winning category: `prizes[0]` is the prize
   ///   allocated for the 2-match category, `prizes[1]` for the 3-match category, and so on.
@@ -711,6 +706,39 @@ contract Lottery is
     numbers = round.numbers;
     closureBlockNumber = round.closureBlockNumber;
     winners = round.winners;
+  }
+
+  /// @notice Returns information about the current round.
+  /// @return baseTicketPrice The price in wei of a 6-number ticket for this round.
+  /// @return prizes The prizes for each of the 5 winning category: `prizes[0]` is the prize
+  ///   allocated for the 2-match category, `prizes[1]` for the 3-match category, and so on.
+  ///   `prizes[4]` is the jackpot.
+  /// @return stash A stash of money collected by withholding a percentage of the ticket sales.
+  ///   This is used to fund the jackpot of the next round in case someone matches all 6 numbers. It
+  ///   is simply carried over otherwise.
+  /// @return totalCombinations The total number of 6-combinations played so far.
+  /// @return drawBlockNumber The number of the block containing the `draw` method call
+  ///   transaction, or 0 if the round is still open.
+  /// @return vrfRequestId The ChainLink VRF request ID, or 0 if the round is still open.
+  function getCurrentRoundData()
+    public
+    view
+    returns (
+      uint256 baseTicketPrice,
+      uint256[5] memory prizes,
+      uint256 stash,
+      uint totalCombinations,
+      uint256 drawBlockNumber,
+      uint256 vrfRequestId
+    )
+  {
+    RoundData storage round = _getCurrentRoundData();
+    baseTicketPrice = round.baseTicketPrice;
+    prizes = getPrizes();
+    stash = getStash();
+    totalCombinations = round.totalCombinations;
+    drawBlockNumber = round.drawBlockNumber;
+    vrfRequestId = round.vrfRequestId;
   }
 
   /// @notice Returns the number of referrals for the specified code and round. Note that this is
@@ -774,11 +802,13 @@ contract Lottery is
   ///   current round as if no drawing had been attempted at all. As a result, should ChainLink ever
   ///   decide to finalize the pending request, the VRF callback will fail.
   function cancelFailedDrawing() public onlyOwner {
-    if (!_open && !Drawing.insideDrawingWindow()) {
-      _open = true;
-    } else {
+    if (_open || Drawing.insideDrawingWindow()) {
       revert InvalidStateError();
     }
+    _open = true;
+    RoundData storage round = _getCurrentRoundData();
+    round.drawBlockNumber = 0;
+    round.vrfRequestId = 0;
   }
 
   /// @dev Initializes a new round, calculating the new ticket price and carrying over the prizes
