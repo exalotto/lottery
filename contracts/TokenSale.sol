@@ -124,7 +124,10 @@ contract LotteryTokenSale is Ownable, Pausable, ReentrancyGuard {
     }
     tokensSold += amount;
     _balances[msg.sender] += amount;
-    currencyToken.safeTransferFrom(msg.sender, address(this), getPriceFor(amount));
+    uint256 priceForAmount = getPriceFor(amount);
+    if (priceForAmount != 0) {
+      currencyToken.safeTransferFrom(msg.sender, address(this), priceForAmount);
+    }
   }
 
   /// @notice Purchases the requested `amount` of EXL-wei and attributes them to the sender,
@@ -141,17 +144,20 @@ contract LotteryTokenSale is Ownable, Pausable, ReentrancyGuard {
     bytes32 r,
     bytes32 s
   ) public {
-    try
-      IERC20Permit(address(currencyToken)).permit(
-        msg.sender,
-        address(this),
-        getPriceFor(amount),
-        deadline,
-        v,
-        r,
-        s
-      )
-    {} catch {}
+    uint256 priceForAmount = getPriceFor(amount);
+    if (priceForAmount != 0) {
+      try
+        IERC20Permit(address(currencyToken)).permit(
+          msg.sender,
+          address(this),
+          priceForAmount,
+          deadline,
+          v,
+          r,
+          s
+        )
+      {} catch {}
+    }
     purchase(amount);
   }
 

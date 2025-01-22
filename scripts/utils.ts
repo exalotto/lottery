@@ -77,9 +77,12 @@ export async function deployWithProxy<Contract extends BaseContract>(
   });
 }
 
-export async function attach(name: string, address: string): Promise<BaseContract> {
+export async function attach<Contract extends BaseContract>(
+  name: string,
+  address: string,
+): Promise<Contract> {
   const factory = await ethers.getContractFactory(name);
-  return factory.attach(address);
+  return factory.attach(address) as Contract;
 }
 
 export async function sendOnce<Contract extends BaseContract>(

@@ -691,18 +691,49 @@ describe('TokenSale', () => {
     });
   });
 
+  it('zero price', async () => {
+    await tokenSale.open(12345, 0);
+    await tokenSale.connect(partner1).purchase(123);
+    expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(0);
+    expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(0);
+    expect(await token.balanceOf(tokenSaleAddress)).to.equal(totalSupply);
+    expect(await tokenSale.tokensForSale()).to.equal(12345);
+    expect(await tokenSale.tokensSold()).to.equal(123);
+    expect(await tokenSale.price()).to.equal(0);
+    expect(await tokenSale.isOpen()).to.equal(true);
+    expect(await tokenSale.balanceOf(owner)).to.equal(0);
+    expect(await tokenSale.balanceOf(partner1)).to.equal(123);
+    expect(await tokenSale.balanceOf(partner2)).to.equal(0);
+  });
+
   it('buy with signature', async () => {
     await tokenSale.open(12345, price1);
     const price = getPrice1(123);
     await currencyToken.connect(partner1).mint(price);
     const { deadline, v, r, s } = await signPermit(partner1, price);
     await tokenSale.connect(partner1).purchaseWithPermit(123, deadline, v, r, s);
-    expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(getPrice1(123));
+    expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(price);
     expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(0);
     expect(await token.balanceOf(tokenSaleAddress)).to.equal(totalSupply);
     expect(await tokenSale.tokensForSale()).to.equal(12345);
     expect(await tokenSale.tokensSold()).to.equal(123);
     expect(await tokenSale.price()).to.equal(price1);
+    expect(await tokenSale.isOpen()).to.equal(true);
+    expect(await tokenSale.balanceOf(owner)).to.equal(0);
+    expect(await tokenSale.balanceOf(partner1)).to.equal(123);
+    expect(await tokenSale.balanceOf(partner2)).to.equal(0);
+  });
+
+  it('zero price with signature', async () => {
+    await tokenSale.open(12345, 0);
+    const { deadline, v, r, s } = await signPermit(partner1, 0n);
+    await tokenSale.connect(partner1).purchaseWithPermit(123, deadline, v, r, s);
+    expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(0);
+    expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(0);
+    expect(await token.balanceOf(tokenSaleAddress)).to.equal(totalSupply);
+    expect(await tokenSale.tokensForSale()).to.equal(12345);
+    expect(await tokenSale.tokensSold()).to.equal(123);
+    expect(await tokenSale.price()).to.equal(0);
     expect(await tokenSale.isOpen()).to.equal(true);
     expect(await tokenSale.balanceOf(owner)).to.equal(0);
     expect(await tokenSale.balanceOf(partner1)).to.equal(123);
@@ -716,7 +747,7 @@ describe('TokenSale', () => {
     await currencyToken.connect(partner1).approve(tokenSaleAddress, price);
     const { deadline, v, r, s } = await signPermit(partner1, price);
     await tokenSale.connect(partner1).purchaseWithPermit(123, deadline, v, r, s);
-    expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(getPrice1(123));
+    expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(price);
     expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(0);
     expect(await token.balanceOf(tokenSaleAddress)).to.equal(totalSupply);
     expect(await tokenSale.tokensForSale()).to.equal(12345);

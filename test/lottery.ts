@@ -2,13 +2,13 @@ import { expect } from 'chai';
 
 import { ethers } from 'hardhat';
 import type { SnapshotRestorer } from '@nomicfoundation/hardhat-network-helpers';
-import { takeSnapshot, time } from '@nomicfoundation/hardhat-network-helpers';
+import { mine, takeSnapshot, time } from '@nomicfoundation/hardhat-network-helpers';
 
 import type { Signer, TypedDataDomain } from 'ethers';
 import type { FakeToken, Lottery, MockVRFCoordinator } from '../typechain-types';
 
 import { Deployer } from '../scripts/deployer';
-import { advanceTime, advanceTimeToNextDrawing, range } from './utils';
+import { advanceTime, advanceTimeToNextDrawing } from './utils';
 
 const NULL_REFERRAL_CODE = '0x0000000000000000000000000000000000000000000000000000000000000000';
 const REFERRAL_CODE1 = '0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -440,6 +440,153 @@ describe('Lottery', () => {
       expect(data2.closureBlockNumber).to.equal(block2 + 2);
       expect(data2.winners).to.deep.equal([0, 1, 0, 1, 0]);
       await expect(lottery.getRoundData(3)).to.be.reverted;
+    });
+  });
+
+  describe('getCurrentRoundData', () => {
+    it('initial state', async () => {
+      const data = await lottery.getCurrentRoundData();
+      expect(data.baseTicketPrice).to.equal(await lottery.getBaseTicketPrice());
+      expect(data.prizes).to.deep.equal([0, 0, 0, 0, 0]);
+      expect(data.stash).to.equal(0);
+      expect(data.totalCombinations).to.equal(0);
+      expect(data.drawBlockNumber).to.equal(0);
+      expect(data.vrfRequestId).to.equal(0);
+    });
+
+    it('updates', async () => {
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 16]);
+      const price = await lottery.getBaseTicketPrice();
+      const value = price * 3n - ((price * 3n) / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      const stash = value - prize * 5n;
+      const data = await lottery.getCurrentRoundData();
+      expect(data.baseTicketPrice).to.equal(price);
+      expect(data.prizes).to.deep.equal([prize, prize, prize, prize, prize]);
+      expect(data.stash).to.equal(stash);
+      expect(data.totalCombinations).to.equal(3);
+      expect(data.drawBlockNumber).to.equal(0);
+      expect(data.vrfRequestId).to.equal(0);
+    });
+
+    it('more updates', async () => {
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await buyTicket([1, 2, 3, 14, 15, 16, 17]);
+      await buyTicket([1, 2, 3, 4, 5, 16]);
+      await buyTicket([31, 32, 33, 34, 35, 36]);
+      await buyTicket([41, 42, 43, 44, 45, 46]);
+      const price = await lottery.getBaseTicketPrice();
+      const value = price * 11n - ((price * 11n) / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      const stash = value - prize * 5n;
+      const data = await lottery.getCurrentRoundData();
+      expect(data.baseTicketPrice).to.equal(price);
+      expect(data.prizes).to.deep.equal([prize, prize, prize, prize, prize]);
+      expect(data.stash).to.equal(stash);
+      expect(data.totalCombinations).to.equal(11);
+      expect(data.drawBlockNumber).to.equal(0);
+      expect(data.vrfRequestId).to.equal(0);
+    });
+
+    it('draw', async () => {
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 16]);
+      const price = await lottery.getBaseTicketPrice();
+      const value = price * 3n - ((price * 3n) / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      const stash = value - prize * 5n;
+      await lottery.draw(
+        subscriptionId,
+        process.env.CHAINLINK_VRF_KEY_HASH!,
+        /*nativePayment=*/ false,
+      );
+      const block = await time.latestBlock();
+      await mine();
+      const data = await lottery.getCurrentRoundData();
+      expect(data.baseTicketPrice).to.equal(price);
+      expect(data.prizes).to.deep.equal([prize, prize, prize, prize, prize]);
+      expect(data.stash).to.equal(stash);
+      expect(data.totalCombinations).to.equal(3);
+      expect(data.drawBlockNumber).to.equal(block);
+      expect(data.vrfRequestId).to.equal(1);
+    });
+
+    it('second round', async () => {
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await buyTicket([1, 2, 3, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 16]);
+      const price = await lottery.getBaseTicketPrice();
+      const value = price * 3n - ((price * 3n) / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      const stash = value - prize * 5n;
+      await draw123456();
+      const block = await time.latestBlock();
+      await mine();
+      const data = await lottery.getCurrentRoundData();
+      expect(data.baseTicketPrice).to.equal(price);
+      expect(data.prizes).to.deep.equal([prize, 0, prize, 0, prize]);
+      expect(data.stash).to.equal(stash);
+      expect(data.totalCombinations).to.equal(0);
+      expect(data.drawBlockNumber).to.equal(0);
+      expect(data.vrfRequestId).to.equal(0);
+    });
+
+    it('updates in second round', async () => {
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 6]);
+      await buyTicket([1, 2, 3, 4, 25, 26]);
+      const price1 = await lottery.getBaseTicketPrice();
+      const value1 = price1 * 3n - ((price1 * 3n) / 10n) * 2n;
+      const prize1 = (value1 * 188n) / 1000n;
+      const stash1 = value1 - prize1 * 5n;
+      await draw123456();
+      await buyTicket([21, 22, 23, 24, 25, 26]);
+      await buyTicket([1, 2, 3, 14, 15, 16, 17]);
+      const price2 = await lottery.getBaseTicketPrice();
+      const value2 = price2 * 8n - ((price2 * 8n) / 10n) * 2n;
+      const prize2 = (value2 * 188n) / 1000n;
+      const stash2 = value2 - prize2 * 5n;
+      const data2 = await lottery.getCurrentRoundData();
+      expect(data2.baseTicketPrice).to.equal(price2);
+      expect(data2.prizes).to.deep.equal([
+        prize2,
+        prize1 + prize2,
+        prize2,
+        prize1 + prize2,
+        stash1 + prize2,
+      ]);
+      expect(data2.stash).to.equal(stash2);
+      expect(data2.totalCombinations).to.equal(8);
+      expect(data2.drawBlockNumber).to.equal(0);
+      expect(data2.vrfRequestId).to.equal(0);
+    });
+
+    it('cancel failed drawing', async () => {
+      await buyTicket([1, 2, 13, 14, 15, 16]);
+      await buyTicket([1, 2, 3, 4, 5, 6]);
+      await buyTicket([1, 2, 3, 4, 25, 26]);
+      const price = await lottery.getBaseTicketPrice();
+      const value = price * 3n - ((price * 3n) / 10n) * 2n;
+      const prize = (value * 188n) / 1000n;
+      const stash = value - prize * 5n;
+      await lottery.draw(
+        subscriptionId,
+        process.env.CHAINLINK_VRF_KEY_HASH!,
+        /*nativePayment=*/ false,
+      );
+      await advanceTime(THREE_DAYS);
+      await mine();
+      await lottery.cancelFailedDrawing();
+      const data = await lottery.getCurrentRoundData();
+      expect(data.baseTicketPrice).to.equal(await lottery.getBaseTicketPrice());
+      expect(data.prizes).to.deep.equal([prize, prize, prize, prize, prize]);
+      expect(data.stash).to.equal(stash);
+      expect(data.totalCombinations).to.equal(3);
+      expect(data.drawBlockNumber).to.equal(0);
+      expect(data.vrfRequestId).to.equal(0);
     });
   });
 
