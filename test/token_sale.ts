@@ -2,16 +2,14 @@ import { expect } from 'chai';
 
 import { ethers } from 'hardhat';
 import type { SnapshotRestorer } from '@nomicfoundation/hardhat-network-helpers';
-import { takeSnapshot } from '@nomicfoundation/hardhat-network-helpers';
+import { takeSnapshot, time } from '@nomicfoundation/hardhat-network-helpers';
 
-import type { Signer } from 'ethers';
+import type { Signer, TypedDataDomain } from 'ethers';
 import type { FakeToken, Lottery, LotteryTokenSale, LotteryToken } from '../typechain-types';
 
 import { Deployer } from '../scripts/deployer';
 
-const NULL_REFERRAL_CODE = '0x0000000000000000000000000000000000000000000000000000000000000000';
-
-const ONE_WEEK = 60 * 60 * 24 * 7;
+const ONE_HOUR = 60 * 60;
 
 describe('TokenSale', () => {
   const deployer = new Deployer();
@@ -71,7 +69,7 @@ describe('TokenSale', () => {
   const buyTokensAtPrice = async (signer: Signer, amount: number | bigint, price: bigint) => {
     await currencyToken.connect(signer).mint(price);
     await currencyToken.connect(signer).approve(tokenSaleAddress, price);
-    await tokenSale.connect(signer).buyTokens(amount);
+    await tokenSale.connect(signer).purchase(amount);
   };
 
   const buyTokens1 = async (signer: Signer, amount: number | bigint) =>
@@ -79,6 +77,36 @@ describe('TokenSale', () => {
 
   const buyTokens2 = async (signer: Signer, amount: number | bigint) =>
     buyTokensAtPrice(signer, amount, getPrice2(amount));
+
+  const signPermit = async (signer: Signer, value: bigint) => {
+    const domain: TypedDataDomain = {
+      chainId: 31337,
+      name: await currencyToken.name(),
+      verifyingContract: await currencyToken.getAddress(),
+      version: '1',
+    };
+    const deadline = (await time.latest()) + ONE_HOUR;
+    const ownerAddress = await signer.getAddress();
+    const message = {
+      owner: ownerAddress,
+      spender: tokenSaleAddress,
+      value,
+      nonce: await currencyToken.nonces(ownerAddress),
+      deadline,
+    };
+    const types = {
+      Permit: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint256' },
+      ],
+    };
+    const signature = await signer.signTypedData(domain, types, message);
+    const { r, s, v } = ethers.Signature.from(signature);
+    return { r, s, v, deadline };
+  };
 
   it('initial state', async () => {
     expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(0);
@@ -661,5 +689,42 @@ describe('TokenSale', () => {
       await tokenSale.connect(partner1).withdrawAll();
       await expect(tokenSale.connect(partner1).withdrawAll()).to.be.reverted;
     });
+  });
+
+  it('buy with signature', async () => {
+    await tokenSale.open(12345, price1);
+    const price = getPrice1(123);
+    await currencyToken.connect(partner1).mint(price);
+    const { deadline, v, r, s } = await signPermit(partner1, price);
+    await tokenSale.connect(partner1).purchaseWithPermit(123, deadline, v, r, s);
+    expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(getPrice1(123));
+    expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(0);
+    expect(await token.balanceOf(tokenSaleAddress)).to.equal(totalSupply);
+    expect(await tokenSale.tokensForSale()).to.equal(12345);
+    expect(await tokenSale.tokensSold()).to.equal(123);
+    expect(await tokenSale.price()).to.equal(price1);
+    expect(await tokenSale.isOpen()).to.equal(true);
+    expect(await tokenSale.balanceOf(owner)).to.equal(0);
+    expect(await tokenSale.balanceOf(partner1)).to.equal(123);
+    expect(await tokenSale.balanceOf(partner2)).to.equal(0);
+  });
+
+  it('buy with front-run approval', async () => {
+    await tokenSale.open(12345, price1);
+    const price = getPrice1(123);
+    await currencyToken.connect(partner1).mint(price);
+    await currencyToken.connect(partner1).approve(tokenSaleAddress, price);
+    const { deadline, v, r, s } = await signPermit(partner1, price);
+    await tokenSale.connect(partner1).purchaseWithPermit(123, deadline, v, r, s);
+    expect(await currencyToken.balanceOf(tokenSaleAddress)).to.equal(getPrice1(123));
+    expect(await currencyToken.balanceOf(lotteryAddress)).to.equal(0);
+    expect(await token.balanceOf(tokenSaleAddress)).to.equal(totalSupply);
+    expect(await tokenSale.tokensForSale()).to.equal(12345);
+    expect(await tokenSale.tokensSold()).to.equal(123);
+    expect(await tokenSale.price()).to.equal(price1);
+    expect(await tokenSale.isOpen()).to.equal(true);
+    expect(await tokenSale.balanceOf(owner)).to.equal(0);
+    expect(await tokenSale.balanceOf(partner1)).to.equal(123);
+    expect(await tokenSale.balanceOf(partner2)).to.equal(0);
   });
 });

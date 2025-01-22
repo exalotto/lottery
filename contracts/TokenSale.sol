@@ -3,10 +3,12 @@ pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+import "./DaiPermit.sol";
 import "./Lottery.sol";
 import "./Token.sol";
 
@@ -110,19 +112,72 @@ contract LotteryTokenSale is Ownable, Pausable, ReentrancyGuard {
     return (price * tokenAmount) / (10 ** token.decimals());
   }
 
-  /// @notice Buys the requested `amount` of EXL-wei and attributes them to the sender, reverting if
-  ///   the token sale is close. An amount of `getPriceFor(amount)` wei of the currency token must
-  ///   have been approved beforehand, otherwise the transaction will fail. Note that the acquired
-  ///   EXL tokens are not yet transferred at this time, they're only associated with `msg.sender`.
-  ///   This method can be invoked multiple times by the same caller and all acquired amounts will
-  ///   add up. The EXL balance of an account can be retrieved by calling `balanceOf`.
-  function buyTokens(uint256 amount) public whenOpen whenNotPaused nonReentrant {
+  /// @notice Purchases the requested `amount` of EXL-wei and attributes them to the sender,
+  ///   reverting if the token sale is close. An amount of `getPriceFor(amount)` wei of the currency
+  ///   token must have been approved beforehand, otherwise the transaction will fail. Note that the
+  ///   acquired EXL tokens are not yet transferred at this time, they're only associated with
+  ///   `msg.sender`. This method can be invoked multiple times by the same caller and all acquired
+  ///   amounts will add up. The EXL balance of an account can be retrieved by calling `balanceOf`.
+  function purchase(uint256 amount) public whenOpen whenNotPaused nonReentrant {
     if (tokensSold + amount > tokensForSale) {
       revert InsufficientTokensError(tokensForSale, amount);
     }
     tokensSold += amount;
     _balances[msg.sender] += amount;
     currencyToken.safeTransferFrom(msg.sender, address(this), getPriceFor(amount));
+  }
+
+  /// @notice Purchases the requested `amount` of EXL-wei and attributes them to the sender,
+  ///   reverting if the token sale is close. This method will automatically approve and transfer an
+  ///   amount of `getPrice(amount)` wei of the currency token using the signature parameters
+  ///   `deadline` and `v` / `r` / `s`. Note that the acquired EXL tokens are not yet transferred at
+  ///   this time, they're only associated with `msg.sender`. This method can be invoked multiple
+  ///   times by the same caller and all acquired amounts will add up. The EXL balance of an account
+  ///   can be retrieved by calling `balanceOf`.
+  function purchaseWithPermit(
+    uint256 amount,
+    uint256 deadline,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
+  ) public {
+    try
+      IERC20Permit(address(currencyToken)).permit(
+        msg.sender,
+        address(this),
+        getPriceFor(amount),
+        deadline,
+        v,
+        r,
+        s
+      )
+    {} catch {}
+    purchase(amount);
+  }
+
+  /// @notice Like `purchaseWithPermit` but uses a slightly different permit interface, the one used
+  ///   in the Dai stablecoin (which is not EIP2612-compliant).
+  function purchaseWithDaiPermit(
+    uint256 amount,
+    uint256 nonce,
+    uint256 expiry,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
+  ) public {
+    try
+      DaiPermit(address(currencyToken)).permit(
+        msg.sender,
+        address(this),
+        nonce,
+        expiry,
+        /*allowed=*/ true,
+        v,
+        r,
+        s
+      )
+    {} catch {}
+    purchase(amount);
   }
 
   /// @notice Transfers the requested EXL-wei `amount` to the sender, reverting if the token sale is
